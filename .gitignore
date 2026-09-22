@@ -1,0 +1,11 @@
+.env
+.env.*
+node_modules/
+dist/
+artifacts/
+*.tgz
+
+__pycache__/
+*.pyc
+.DS_Store
+release/

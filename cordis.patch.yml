@@ -1,0 +1,41 @@
+- insert:
+    - id: just-enough-tools
+      name: dsh-just-enough-tools
+
+    - id: preset-just-enough-tools
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: just-enough-tools
+        name: Just enough tools
+        description: Jev-powered progressive tools and skills
+        order: 30
+        plugins:
+          - id: native-tools
+            name: '@deepseek-ai/dsh-agent-tool-presentation'
+            config:
+              mode: native
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: You are a coding agent powered by the {{model}} model.
+              suffix: Your working directory is {{cwd}}.
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+          - id: tool-bash
+            name: '@deepseek-ai/dsh-tool-bash'
+            disabled: !!js process.platform === 'win32'
+          - id: tool-pwsh
+            name: '@deepseek-ai/dsh-tool-pwsh'
+            disabled: !!js process.platform !== 'win32'
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+          - id: routing
+            name: dsh-just-enough-tools/session
