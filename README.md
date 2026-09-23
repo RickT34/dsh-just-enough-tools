@@ -62,7 +62,7 @@ npm pack
 Install it into your dsh Web profile:
 
 ```sh
-npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.5.1.tgz
+npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.5.2.tgz
 ```
 
 Restart your dsh Web process (`npx @deepseek-ai/dsh@0.1.7-alpha.1 web`), then:
@@ -141,7 +141,7 @@ See [plugin integration details](docs/integration.md) for capability ownership a
 
 ## Inspect scores and missing tools
 
-**Routing diagnostics in the dsh terminal** is enabled by default in plugin settings and takes effect immediately. Look for `[Just enough tools]` in the terminal running `dsh web`. Logs show scoring start, candidate IDs, exact probabilities, threshold, newly admitted and currently enabled capabilities, tagged with the session ID. Diagnostics add no model calls and do not enter the model prompt.
+**Routing diagnostics in the dsh terminal** is enabled by default in plugin settings and takes effect immediately. Look for `[Just enough tools]` in the terminal running `dsh web`. Logs show scoring start, candidate IDs, exact probabilities, threshold, newly admitted and currently enabled capabilities, tagged with the session ID. Since v0.5.2, diagnostics write directly to stderr independently of host logger levels, with a `diagnostics enabled` line when the mode attaches. Use `2>routing.log` to save stderr, or `2>&1 | tee routing.log` to display and save both streams. Diagnostics add no model calls and do not enter the model prompt.
 
 At threshold `0.5`, `tool:read = 0.82` reports `opened`; `skill:debug = 0.5` reports `below-or-equal-threshold`. All low scores produce `none-above-threshold`; an empty remaining pool reports `no remaining candidates`.
 

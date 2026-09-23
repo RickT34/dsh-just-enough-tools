@@ -27,3 +27,8 @@ export function routingErrorHint(code?: string): string {
   if (code === 'REGISTRATION_FAILED') return 'Capability loading or registration failed; no capabilities from this batch were opened.';
   return 'Check the provider protocol, model and endpoint; the response must contain one valid probability per candidate.';
 }
+
+/** Cordis logger exporters may be absent in Web mode. Use the launcher's stderr. */
+export function writeRoutingDiagnostic(line: string): void {
+  process.stderr.write(`${line.replace(/[\r\n]/g, ' ')}\n`);
+}

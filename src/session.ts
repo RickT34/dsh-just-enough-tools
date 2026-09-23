@@ -4,6 +4,7 @@ import type { Context } from '@deepseek-ai/cordis';
 import { installJustEnoughTools } from './index.js';
 import type { ToolCandidate } from './index.js';
 import type {} from './plugin.js';
+import { writeRoutingDiagnostic } from './diagnostics.js';
 import { discoverSkills } from './skills.js';
 
 export const name = 'just-enough-tools-session';
@@ -31,6 +32,7 @@ export function apply(ctx: Context): void {
       failOnRoutingError: true,
     });
     settings.track(agent, stop);
+    if (settings.config.debug.get()) writeRoutingDiagnostic(`[Just enough tools] session=${agent.session.id} diagnostics enabled; protocol=${settings.config.protocol.get()}; initial tool candidates=${catalog.length}`);
     return true;
   };
   ctx.on('agent/created', ({ agent }) => { attach(agent); return undefined; });

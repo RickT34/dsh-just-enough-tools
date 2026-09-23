@@ -8,7 +8,7 @@ import type { ToolDefinition } from '@deepseek-ai/dsh-tools';
 import { jevConfigFromEnv, JevScorer, ScorerError, validateScores } from './scorer.js';
 import type { CapabilitySummary, Scorer, ScoringResult } from './scorer.js';
 export * from './scorer.js';
-import { decisionSummary, routingErrorHint } from './diagnostics.js';
+import { decisionSummary, routingErrorHint, writeRoutingDiagnostic } from './diagnostics.js';
 
 export const name = 'just-enough-tools';
 export const inject = ['agents', 'tools', 'systemPrompt'];
@@ -231,7 +231,7 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
         catalogComplete = snapshot.complete;
       } catch {
         signal.throwIfAborted(); catalogComplete = false;
-        ctx.logger.warn(`[Just enough tools] session=${agent.session.id} SKILL_DISCOVERY_FAILED: keeping last-known candidates.`);
+        writeRoutingDiagnostic(`[Just enough tools] session=${agent.session.id} SKILL_DISCOVERY_FAILED: keeping last-known candidates.`);
       }
     }
     if (pendingRestore.length) {
@@ -249,11 +249,11 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
     const candidates = remaining();
     if (!candidates.length) {
       lastScored = afterStepSeq; lastScoredSkillRevision = skillRevision;
-      if (config.debug?.()) ctx.logger.info(`[Just enough tools] session=${agent.session.id} no remaining candidates; enabled=${JSON.stringify([...enabled])}; catalogComplete=${catalogComplete}`);
+      if (config.debug?.()) writeRoutingDiagnostic(`[Just enough tools] session=${agent.session.id} no remaining candidates; enabled=${JSON.stringify([...enabled])}; catalogComplete=${catalogComplete}`);
       return;
     }
     const started = Date.now();
-    if (config.debug?.()) ctx.logger.info(`[Just enough tools] session=${agent.session.id} scoring ${JSON.stringify(candidates)}; threshold=${threshold}; catalogComplete=${catalogComplete}`);
+    if (config.debug?.()) writeRoutingDiagnostic(`[Just enough tools] session=${agent.session.id} scoring ${JSON.stringify(candidates)}; threshold=${threshold}; catalogComplete=${catalogComplete}`);
     let result: ScoringResult, status: Decision['status'] = 'ok', errorCode: string | undefined;
     let added: string[] = [];
     try {
@@ -293,7 +293,7 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
     agent.session.append('just-enough-tools/decision', decision);
     if (config.debug?.() || status !== 'ok') {
       const line = `[Just enough tools] session=${agent.session.id} ${decisionSummary(decision)}`;
-      if (status === 'ok') ctx.logger.info(line); else ctx.logger.warn(line);
+      writeRoutingDiagnostic(line);
     }
     if (status !== 'ok' && config.failOnRoutingError) {
       throw new Error(`Just enough tools: ${errorCode}. ${routingErrorHint(errorCode)} Open Plugins > dsh-just-enough-tools and check the dsh terminal for routing diagnostics.`);
@@ -385,7 +385,7 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
           if (catalogComplete && enabled.size === 0 && belowThreshold) {
             continued = true;
             agent.session.append('just-enough-tools/direct-answer', { version: 1, afterStepSeq: latest.seq });
-            if (config.debug?.()) ctx.logger.info(`[Just enough tools] session=${agent.session.id} direct-answer accepted; skipped second model call.`);
+            if (config.debug?.()) writeRoutingDiagnostic(`[Just enough tools] session=${agent.session.id} direct-answer accepted; skipped second model call.`);
             return;
           }
         }

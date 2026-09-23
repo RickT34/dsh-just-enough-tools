@@ -58,3 +58,44 @@ test('registration failure is visible and keeps the batch closed', async t => {
   assert.doesNotMatch(String(h.errors[0]), /secret provider response/);
   assert.deepEqual(h.ctx.tools.schemas(agent), []);
 });
+
+// Test the actual process output with no Cordis logging exporter installed.
+// A logger spy would miss the Web-mode bug this guards against.
+test('routing scores reach stderr without a host logger exporter', async () => {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const script = `
+    import { harness, candidate, ScriptedAdapter, textResponse, run } from './tests/helpers.ts';
+    const h = await harness(new ScriptedAdapter([textResponse('plan'),textResponse('answer')]), {
+      catalog: [candidate('read')], debug: () => true,
+      scorer: {score: async () => ({scores: {'tool:read': 0.75}})},
+    });
+    const agent = await h.create(); await run(agent);
+    await h.ctx.fiber.dispose();
+  `;
+  const result = await promisify(execFile)(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], {
+    cwd: new URL('..', import.meta.url), timeout: 10000,
+  });
+  assert.match(result.stderr, /\[Just enough tools\].*scoring/);
+  assert.match(result.stderr, /"id":"tool:read","score":0.75,"result":"opened"/);
+  assert.match(result.stderr, /"enabled":\["tool:read"\]/);
+  assert.equal(result.stdout, '');
+});
+
+test('disabled diagnostics do not print successful routing decisions', async () => {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const script = `
+    import { harness, candidate, ScriptedAdapter, textResponse, run } from './tests/helpers.ts';
+    const h = await harness(new ScriptedAdapter([textResponse('plan'),textResponse('answer')]), {
+      catalog: [candidate('read')], debug: () => false,
+      scorer: {score: async () => ({scores: {'tool:read': 0.75}})},
+    });
+    const agent = await h.create(); await run(agent);
+    await h.ctx.fiber.dispose();
+  `;
+  const result = await promisify(execFile)(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], {
+    cwd: new URL('..', import.meta.url), timeout: 10000,
+  });
+  assert.doesNotMatch(result.stderr, /\[Just enough tools\]/);
+});
