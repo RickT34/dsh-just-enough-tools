@@ -141,6 +141,14 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
   };
   const checkAssembly = (assembly: PromptAssembly) => {
     assertRegistry();
+    // Some native tools (notably bash) register static guidance even while
+    // their schemas are restricted. Gate these sections with their candidate.
+    // Return a new assembly so other agents retain their inherited guidance.
+    if (config.inheritedGuidance) {
+      assembly = { ...assembly, sections: assembly.sections.filter(section =>
+        !(section.name.startsWith('tool:') && catalog.get(section.name)?.kind === 'tool'
+          && !enabled.has(section.name))) };
+    }
     const names = toolNames();
     if (assembly.tools.length !== names.length || assembly.tools.some(t => !names.includes(t.name))) {
       throw new Error('A schema provider changed the Just enough tools tool set.');

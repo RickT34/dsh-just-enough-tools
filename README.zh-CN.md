@@ -60,7 +60,7 @@ npm pack
 安装到 dsh 的 Web profile：
 
 ```sh
-npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.4.1.tgz
+npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.4.2.tgz
 ```
 
 重新启动 dsh Web 进程（`npx @deepseek-ai/dsh@0.1.7-alpha.1 web`），然后：

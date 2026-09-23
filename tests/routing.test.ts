@@ -320,3 +320,38 @@ test('legacy tool-only decisions restore into the namespaced capability model', 
   const { agent } = await h.ctx.agents.create({ sessionId: SessionId('legacy'), seed, agentOptions: { provider: 'test', model: 'test' } });
   assert.ok(h.ctx.tools.get('read', agent));
 });
+
+test('static native guidance stays hidden until admission and remains intact outside the agent', async t => {
+  const adapter = new ScriptedAdapter([textResponse('plan'), callResponse('bash'), textResponse('done')]);
+  const h = await harness(adapter, {
+    catalog: [candidate('bash'), candidate('unused')], inheritedGuidance: true,
+    scorer: { score: async input => ({ scores: Object.fromEntries(input.candidates.map(id => [id, id === 'tool:bash' ? 0.9 : 0])) }) },
+  });
+  t.after(() => h.ctx.fiber.dispose());
+  const guidance = 'Check the [exit code: N] marker on every bash result; investigate failures before moving on.';
+  h.ctx.systemPrompt.section({ name: 'tool:bash', order: 1100, text: guidance });
+  h.ctx.systemPrompt.section({ name: 'tool:unused', order: 1101, text: 'UNSELECTED_STATIC_GUIDANCE' });
+  const agent = await h.create();
+  await run(agent);
+  assert.deepEqual(h.errors, []);
+  assert.equal(adapter.requests.length, 3);
+  assert.ok(!prompt(adapter.requests[0]!).includes(guidance));
+  assert.ok(prompt(adapter.requests[1]!).includes(guidance));
+  assert.ok(prompt(adapter.requests[2]!).includes(guidance));
+  assert.ok(adapter.requests.every(request => !prompt(request).includes('UNSELECTED_STATIC_GUIDANCE')));
+  assert.deepEqual(adapter.requests.map(request => request.tools?.map(tool => tool.name) ?? []), [[], ['bash'], ['bash']]);
+  const outside = await h.ctx.systemPrompt.assemble();
+  assert.ok(outside.sections.some(section => section.text === guidance));
+  assert.ok(outside.sections.some(section => section.text === 'UNSELECTED_STATIC_GUIDANCE'));
+});
+
+test('inherited guidance from an unknown capability still fails closed', async t => {
+  const adapter = new ScriptedAdapter([]);
+  const h = await harness(adapter, { catalog: [candidate('bash')], inheritedGuidance: true,
+    scorer: { score: async () => ({ scores: {} }) } });
+  t.after(() => h.ctx.fiber.dispose());
+  h.ctx.systemPrompt.section({ name: 'tool:unmanaged', order: 1100, text: 'Use unmanaged.' });
+  const agent = await h.create();
+  await assert.rejects(agent.ctx.systemPrompt.assemble(assembleContextFor(agent)), /independently registered capability guidance/);
+  assert.equal(adapter.requests.length, 0);
+});

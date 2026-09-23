@@ -60,7 +60,7 @@ npm pack
 Install it into your dsh Web profile:
 
 ```sh
-npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.4.1.tgz
+npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.4.2.tgz
 ```
 
 Restart your dsh Web process (`npx @deepseek-ai/dsh@0.1.7-alpha.1 web`), then:

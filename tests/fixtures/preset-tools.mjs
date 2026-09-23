@@ -5,5 +5,5 @@ export function apply(ctx) {
     execute: async () => 'fixture record',
     output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
   });
-  ctx.systemPrompt.section({name:'tool:read',order:1100,text:({scope})=>ctx.tools.get('read',scope) ? 'Use read to inspect a record.' : ''});
+  ctx.systemPrompt.section({name:'tool:read',order:1100,text:'Use read to inspect a record.'});
 }
