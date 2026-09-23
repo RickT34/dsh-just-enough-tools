@@ -2,82 +2,84 @@
 
 **Think first. Bring in tools and skills when they matter.**
 
-[简体中文](README.zh-CN.md) · [How it works](#how-it-works) · [Install](#install-into-deepseek-harness) · [Contributing](CONTRIBUTING.md)
+[简体中文](README.zh-CN.md) · [Install](#install) · [Contributing](CONTRIBUTING.md)
 
 **Our goal: nearly half the agent cost, with accuracy intact.**
 
-Just enough tools is a [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin that uses [Jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev) to reveal tools and skills progressively. The main model starts with a clean planning step. Jev then selects which capabilities to add as the task unfolds.
+Just enough tools is a [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin for progressive tool and skill selection, powered by [Jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev), with an optional OpenAI-compatible scorer.
 
-Agents often receive more tools and skills than a task needs. This creates two sources of waste:
+Agents often receive more capabilities than a task needs:
 
-- **Extra input cost:** schemas and descriptions for unused tools and skills occupy context and incur input-token costs on repeated model calls.
-- **Overuse:** agents can invoke tools and skills unnecessarily, adding execution steps, latency and cost.
+- **Extra input cost:** unused tool and skill schemas and descriptions consume tokens on repeated requests.
+- **Overuse:** unnecessary tool and skill invocations add steps, latency and cost.
 
-Just enough tools lets Jev select from a shared pool of tools and skills, exposing only the capabilities needed as the task progresses.
-
-- **Tools and skills as equals.** One candidate pool, one threshold, one decision loop.
-- **Room to adapt.** Add tools or skills as new requirements and results arrive.
-- **Controlled exposure.** Selected tools become callable; selected skills contribute their full instructions.
-- **Easy to inspect.** Each agent has an isolated capability set and a trace of scores, additions and usage.
+The plugin puts tools and skills in one candidate pool and exposes only the capabilities selected for the task. Each agent has its own enabled set.
 
 ## How it works
 
 ```mermaid
 flowchart TD
-    A(["Agent: Think first<br/>No tools or skills"]) -->|Plan and capability needs| B["Jev: Score tools and skills"]
+    A(["Agent: Think first<br/>No tools or skills"]) -->|Answer or plan| B["Scorer: Evaluate tools and skills<br/>Jev or configured chat model"]
     B -->|Capabilities above threshold| C["Agent: Use selected capabilities"]
     C -->|More work: updated progress| B
 ```
 
-**Agent thinks → Jev selects tools and skills → Agent acts.** Each tool and skill is independently scored against the same threshold. A selected tool is registered; a selected skill's instructions are loaded into the Agent's context. Enabled capabilities stay available, and subsequent decisions consider only the remaining candidates.
+Each capability receives an independent score. Tools **above** the shared threshold become callable; selected skills load their full instructions. Enabled capabilities remain available, while later decisions consider the remaining candidates. A skill's required tools are scored separately.
 
-Skills are not hidden behind another tool-selection step. They can be selected without any tool, or alongside tools in the same batch. A newly loaded workflow can reveal a need for additional capabilities, which Jev can select next.
+For simple tasks, the Agent can provide a complete first-response answer beginning with `No external capabilities needed.` If discovery is complete and all scores are **strictly below** the threshold, the plugin skips the second Agent call. Scoring still runs; failed scoring does not approve an early finish.
 
-Simple tasks can finish in the first response. The Agent must start with the standalone declaration `无需外部能力。` and provide a complete answer. The scorer still checks the candidates: only a complete catalog and successful scores **strictly below the threshold** allow skipping the second model call. A plan alone, a declaration without an answer, a score equal to the threshold, or a scoring failure does not qualify. Later user tasks are scored again.
+### Example
 
-### Example: fix a login bug
+For “Fix the login error and run the tests,” the scorer can first enable the `login-debug` skill and `grep`/`read`, then add `edit` and `bash` as the task progresses. A writing task may need only a style skill, or no external capabilities at all.
 
-> “Fix the login error and run the tests.”
+## Install
 
-With a `login-debug` skill installed, one possible sequence is:
+Requires Node.js 22.19+, DeepSeek Harness **0.1.7-alpha.1**, and Cordis **4.0.3**.
 
-| Stage | Capabilities available to the Agent | What happens |
-| --- | --- | --- |
-| Plan | None | Agent plans to inspect the login code, fix it and verify the result |
-| Investigate | Skill: `login-debug`; tools: `grep`, `read` | Agent follows the debugging workflow and locates the error |
-| Fix | Skill: `login-debug`; tools: `grep`, `read`, **`edit`** | Jev selects `edit`; Agent applies the fix |
-| Verify | Skill: `login-debug`; tools: `grep`, `read`, `edit`, **`bash`** | Jev selects `bash`; Agent runs the tests and reports the result |
-
-For a rewriting task, Jev might select only a writing-style skill and no tools. If neither kind is needed, the Agent can answer directly.
-
-## Install into DeepSeek Harness
-
-Requires Node.js 22.19+ and DeepSeek Harness `0.1.7-alpha.1` / Cordis `4.0.3`. From the Just enough tools checkout, build the plugin bundle:
+Build from the repository:
 
 ```sh
 npm ci
 npm pack
 ```
 
-Install it into your dsh Web profile:
+Install the package and start dsh:
 
 ```sh
-npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.5.2.tgz
+npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/dsh-just-enough-tools-0.5.3.tgz
+npx @deepseek-ai/dsh@0.1.7-alpha.1 web
 ```
 
-Restart your dsh Web process (`npx @deepseek-ai/dsh@0.1.7-alpha.1 web`), then:
-
 1. Open **Plugins → dsh-just-enough-tools**.
-2. Choose the **Provider API protocol**, enter its **Provider API key**, optionally override the URL and model, and click **Save**.
-3. Start a new conversation and choose **Just enough tools** in the mode picker before sending the first message.
+2. Choose a provider protocol, configure credentials and model, and save.
+3. Start a new conversation in **Just enough tools** mode.
 
-Just enough tools appears alongside the existing Standard, PTC, Minimal and Creator modes. It does not change the default mode or route ordinary-mode agents. If the mode picker is hidden, enable mode selection in dsh's General settings.
+The acting model remains the one configured in dsh. The mode includes file, search and terminal tools, and discovers model-invocable skills through dsh.
 
-The mode comes with file, file-search and terminal tools, plus dsh skill discovery. Put skills under your project's `.dsh/skills` or `.agents/skills`, or the user skill directories configured in dsh. New skills are discovered as the task progresses. No catalog module or YAML edits are needed. The acting model remains the one configured in dsh — **Jev selects capabilities, the Agent does the work**.
+## Providers and settings
 
-### Add a skill
+| Protocol | Default base URL | Model | Key environment variable |
+| --- | --- | --- | --- |
+| System One / TypeSafe | `https://api.typesafe.ai/v1` | `jev-latest` | `TYPESAFE_API_KEY` |
+| Vercel AI Gateway (Evaluation) | `https://ai-gateway.vercel.sh/v4/ai` | `typesafe-ai/jev` | `AI_GATEWAY_API_KEY` |
+| OpenAI-compatible / LM Studio | `http://127.0.0.1:1234/v1` | Required: provider model ID | `OPENAI_API_KEY` |
 
-Create `.dsh/skills/login-debug/SKILL.md` in your project:
+Custom compatible base URLs and full endpoints are supported. Credentials are resolved in this order: saved key → `JEV_API_KEY` → provider environment variable. Reset a saved key to use an environment variable. Unauthenticated local chat servers may leave the key blank. dsh reads `.env` at startup; restart it after changing that file.
+
+System One and Vercel return native decision probabilities. OpenAI-compatible scoring requires a generative model that returns JSON scores; these are model estimates, not calibrated decision probabilities. Encoder-only models require a separate decision service. There is no automatic fallback between protocols.
+
+| Setting | Default |
+| --- | --- |
+| Tool / skill threshold | `0.5` |
+| Maximum steps per user turn | `12` |
+| Routing operation timeout | `60000` ms |
+| Terminal routing diagnostics | Enabled |
+
+Provider settings and diagnostics apply immediately; start a new conversation after changing routing limits. Diagnostics show per-capability scores, threshold and admission results in the dsh terminal. Scoring or registration failures stop execution with an explicit error.
+
+## Add a skill
+
+Create `.dsh/skills/login-debug/SKILL.md` (or use dsh's other configured skill directories):
 
 ```markdown
 ---
@@ -87,80 +89,10 @@ description: Diagnose login and session failures before changing authentication 
 Reproduce the failure, inspect the relevant code, make a focused fix, and run the affected tests.
 ```
 
-Jev initially receives the skill's summary, not its full body. Selected instructions are injected automatically, preserving resource paths; there is no extra `skill` tool to unlock. Only model-invocable skills participate. Tools needed by a skill still pass their own threshold.
+The scorer initially sees the summary; the Agent receives full instructions only after selection. Capability selection controls availability and instruction injection, not filesystem permissions.
 
-### Missing preset component at startup
+## Contribute
 
-If startup reports `Cannot find package '@deepseek-ai/dsh-agent-preset'`, check `dsh --version`. This plugin requires **0.1.7-alpha.1**; the 0.1.5 CLI does not include this component. Use the pinned version for both installation and startup. Updating the plugin does not upgrade dsh:
+Help improve capability selection, provider support, thresholds and examples. See [CONTRIBUTING.md](CONTRIBUTING.md), [design](DESIGN.md), and [integration details](docs/integration.md).
 
-```sh
-npx @deepseek-ai/dsh@0.1.7-alpha.1 web
-```
-
-### Vercel AI Gateway and custom providers
-
-In **Plugins → dsh-just-enough-tools**, select **Vercel AI Gateway (Evaluation)** and enter your Gateway API key. Leave the URL and model blank to use these defaults:
-
-| Setting | Vercel AI Gateway | System One / TypeSafe |
-| --- | --- | --- |
-| API base URL | `https://ai-gateway.vercel.sh/v4/ai` | `https://api.typesafe.ai/v1` |
-| Jev model | `typesafe-ai/jev` | `jev-latest` |
-| Key environment variable | `AI_GATEWAY_API_KEY` | `TYPESAFE_API_KEY` |
-
-You can also set `JEV_API_KEY` for either protocol. A saved key takes priority, followed by `JEV_API_KEY`, then the matching provider variable. When switching providers, replace the saved key or reset it to use the environment variable; clear any old URL/model overrides to use the new defaults.
-
-For another provider or a self-hosted proxy, choose its compatible protocol and enter its base URL, API key and Jev model ID. Full endpoints are also accepted. System One uses `/systemone` with Noul answers; Vercel uses `/evaluation-model` with boolean probabilities, matching the [AI SDK evaluation interface](https://vercel.com/docs/ai-gateway/sdks-and-apis/ai-sdk). An OpenAI-compatible chat endpoint alone does not supply this evaluation protocol.
-
-### OpenAI-compatible providers / LM Studio
-
-Select **OpenAI-compatible / LM Studio (Chat scoring)**, use `http://127.0.0.1:1234/v1`, and enter the actual model ID from LM Studio's `/v1/models`. Leave the key blank for an unauthenticated local server. Remote providers can use their own key or `OPENAI_API_KEY` (overridden by `JEV_API_KEY`).
-
-This mode requires Chat Completions JSON such as `{"scores":{"tool:read":0.9,"skill:debug":0.2}}`. Values are chat-model estimates, not native Jev/Laya decision probabilities. The same threshold applies. Missing/unknown IDs, invalid scores, truncation and malformed JSON fail closed. There is no automatic fallback from Jev to chat scoring.
-
-### Settings
-
-| Field | Default | Purpose |
-| --- | --- | --- |
-| Provider API protocol | `systemone` | System One or Vercel Evaluation; compatible custom endpoints supported |
-| Provider API key | empty | Saved key, then `JEV_API_KEY`, then the matching provider environment variable |
-| API base URL | blank: protocol default | Compatible provider base URL or full endpoint |
-| Jev model | blank: protocol default | Provider-specific Jev model ID |
-| Tool / skill threshold | `0.5` | The same strict probability threshold for both kinds |
-| Steps per user turn | `12` | Maximum model decisions, including planning |
-| Routing timeout | `60000` ms | Bound each discovery, scoring or skill-loading operation |
-
-Settings are persisted through dsh. Saved keys are redacted from settings reads and never filled back into the page; leave the field blank to keep the saved key, or use **Reset saved key** to remove the profile override. Protocol, API key, URL and model changes apply to the next scoring call. Start a new conversation to use new routing limits.
-
-To remove the mode:
-
-```sh
-dsh plugin --profile web remove dsh-just-enough-tools
-```
-
-See [plugin integration details](docs/integration.md) for capability ownership and mode lifecycle.
-
-## Inspect scores and missing tools
-
-**Routing diagnostics in the dsh terminal** is enabled by default in plugin settings and takes effect immediately. Look for `[Just enough tools]` in the terminal running `dsh web`. Logs show scoring start, candidate IDs, exact probabilities, threshold, newly admitted and currently enabled capabilities, tagged with the session ID. Since v0.5.2, diagnostics write directly to stderr independently of host logger levels, with a `diagnostics enabled` line when the mode attaches. Use `2>routing.log` to save stderr, or `2>&1 | tee routing.log` to display and save both streams. Diagnostics add no model calls and do not enter the model prompt.
-
-At threshold `0.5`, `tool:read = 0.82` reports `opened`; `skill:debug = 0.5` reports `below-or-equal-threshold`. All low scores produce `none-above-threshold`; an empty remaining pool reports `no remaining candidates`.
-
-- `HTTP_401` / `HTTP_403`: check the provider and matching API key.
-- `HTTP_404`: check protocol, endpoint and model; the Vercel base is `https://ai-gateway.vercel.sh/v4/ai`.
-- `HTTP_429`: check provider quota or rate limits.
-- `NETWORK_ERROR` / `ROUTING_TIMEOUT`: check connectivity or increase the timeout.
-- `REGISTRATION_FAILED`: skill loading or tool registration failed; the entire batch was rolled back.
-
-Scoring and registration failures stop execution with an explicit error instead of silently continuing without tools. Fix configuration and retry. Decisions remain in the session's `just-enough-tools/decision` events. Logs omit API keys, task text, skill instructions and raw provider responses.
-
-## Help shape the next version
-
-We welcome new tools and skills, better threshold policies, and ways to avoid scoring when no new capability is needed. Share your use case, feedback, or a small reproducible example to help improve Just enough tools.
-
-```sh
-npm test
-npm run typecheck
-npm run build
-```
-
-Tests require no API keys. See [CONTRIBUTING.md](CONTRIBUTING.md). Just enough tools is an independent community project, licensed under [MIT](LICENSE).
+Independent community project · [MIT license](LICENSE).

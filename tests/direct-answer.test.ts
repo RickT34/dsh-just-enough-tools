@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { candidate, harness, ScriptedAdapter, textResponse, run } from './helpers.js';
 
 for (const [name, first, score, expected] of [
-  ['complete direct answer with low scores', '无需外部能力。\n\n2 + 2 = 4。', 0.1, 1],
-  ['score at threshold remains conservative', '无需外部能力。\n\n答案。', 0.5, 2],
-  ['needed tool overrides direct declaration', '无需外部能力。\n\n答案。', 0.9, 2],
-  ['plan alone still needs a final answer', '先考虑这个问题。', 0.1, 2],
-  ['declaration without answer is incomplete', '无需外部能力。', 0.1, 2],
+  ['complete direct answer with low scores', 'No external capabilities needed.\n\n2 + 2 = 4.', 0.1, 1],
+  ['score at threshold remains conservative', 'No external capabilities needed.\n\nThe answer.', 0.5, 2],
+  ['needed tool overrides direct declaration', 'No external capabilities needed.\n\nThe answer.', 0.9, 2],
+  ['plan alone still needs a final answer', 'I will consider the question first.', 0.1, 2],
+  ['declaration without answer is incomplete', 'No external capabilities needed.', 0.1, 2],
 ] as const) test(name, async t => {
   let calls = 0;
   const adapter = new ScriptedAdapter([textResponse(first), textResponse('final')]);
@@ -24,7 +24,7 @@ for (const [name, first, score, expected] of [
 });
 
 test('failed scoring does not accept a direct answer as verified', async t => {
-  const adapter = new ScriptedAdapter([textResponse('无需外部能力。\n\n4。')]);
+  const adapter = new ScriptedAdapter([textResponse('No external capabilities needed.\n\n4.')]);
   const h = await harness(adapter, { catalog: [candidate('read')], failOnRoutingError: true,
     scorer: { score: async () => { throw new Error('fixture failure'); } } });
   t.after(() => h.ctx.fiber.dispose());
@@ -34,7 +34,7 @@ test('failed scoring does not accept a direct answer as verified', async t => {
 });
 
 test('incomplete discovery cannot approve a direct answer', async t => {
-  const adapter = new ScriptedAdapter([textResponse('无需外部能力。\n\n4。'), textResponse('final')]);
+  const adapter = new ScriptedAdapter([textResponse('No external capabilities needed.\n\n4.'), textResponse('final')]);
   const h = await harness(adapter, { catalog: [candidate('read')], discoverSkills: async () => ({ skills: [], complete: false }),
     scorer: { score: async () => ({ scores: { 'tool:read': 0.1 } }) } });
   t.after(() => h.ctx.fiber.dispose());
@@ -45,7 +45,7 @@ test('incomplete discovery cannot approve a direct answer', async t => {
 
 test('a later user task is scored again after a direct answer', async t => {
   let calls = 0;
-  const adapter = new ScriptedAdapter([textResponse('无需外部能力。\n\n4。'), textResponse('read is now available')]);
+  const adapter = new ScriptedAdapter([textResponse('No external capabilities needed.\n\n4.'), textResponse('read is now available')]);
   const h = await harness(adapter, { catalog: [candidate('read')], scorer: {
     score: async input => { calls++; return { scores: { 'tool:read': input.task.includes('Read file') ? 0.9 : 0.1 } }; },
   } });

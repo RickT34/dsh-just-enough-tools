@@ -1,13 +1,11 @@
 # Design
 
-Just enough tools treats tools and skills as peers in one capability catalog. IDs are namespaced (`tool:name`, `skill:name`) so equal names do not collide. Jev scores every remaining candidate independently with the same necessity criterion (System One Noul or Vercel boolean probability) and threshold.
+Tools and skills are peers in a shared capability catalog. Namespaced IDs prevent collisions, and a single threshold governs admission. Each agent maintains its own enabled set.
 
-The Agent's first step sees neither tool schemas nor skill instructions. An admitted tool is registered with its schema and guidance. An admitted skill is loaded and delivered as user-role instruction context, preserving dsh resource-base hints and literal content. Neither kind automatically admits the other. Newly revealed skill instructions can inform the next selection of dependencies.
+The Agent starts without tools or skills. The scorer evaluates its public answer or plan and admits capabilities as needed. A complete first-response answer can finish immediately when discovery is complete and all scores are strictly below the threshold.
 
-Each agent owns a monotonic enabled set. Metadata discovery refreshes skills between model steps; incomplete observations retain last-known candidates. Admission stages all skill loads before registering anything, rolls back mixed batches on failure, and discards late/cancelled results. Existing execution guards remain in force.
+Selected tools expose their schemas, executors and guidance. Selected skills contribute instructions, with their dependencies scored separately. Admission is atomic across a batch, and cancellation prevents late changes. Session events support inspection and replay.
 
-Decision events record capability IDs and kinds. Replay migrates legacy tool-only IDs and restores selected skills before continuing. Full native skill catalogs and native invocation injections are suppressed in Just enough tools mode; skill selection is not a filesystem sandbox.
+System One and Vercel use native decision probabilities. OpenAI-compatible chat scoring is an explicit alternative using generated estimates. Invalid or incomplete scores never partially open a batch.
 
-See [the README](README.md) for the flow and [integration details](docs/integration.md) for lifecycle requirements. Jev handles selection; dsh provides the acting model and tool runtime.
-
-OpenAI-compatible chat scoring is an explicit alternative protocol: it requests one JSON score per candidate and rejects incomplete or invalid outputs. These values are model estimates, not calibrated native decision probabilities. Encoder-only Laya GGUF cannot generate that chat response; it requires its separate decision head.
+See the [README](README.md) for usage and [integration details](docs/integration.md) for lifecycle contracts.

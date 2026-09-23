@@ -76,7 +76,7 @@ declare module '@deepseek-ai/dsh-llm' {
 const REASSEMBLED = Symbol('just-enough-tools-reassembled');
 const PLAN_SECTION = 'just-enough-tools:phase';
 const installed = new WeakSet<Agent>();
-const INITIAL_PROMPT = '先独立分析用户任务，给出简短计划，并说明完成任务可能需要哪些外部操作能力或专业工作流程。无需猜测具体工具或 skill 名称。如果无需任何外部工具或 skill 就能完整回答，请直接给出最终答案，并以独立首行“无需外部能力。”明确声明，后面必须包含完整答案。如果仍需外部能力，本轮只给计划和能力需求，下一轮再执行。';
+const INITIAL_PROMPT = 'Analyze the user task independently. Give a brief plan and identify any external operations or specialized workflows needed, without guessing specific tool or skill names. If you can answer completely without external tools or skills, provide the complete final answer now, preceded by the standalone first line "No external capabilities needed." Otherwise, provide only your plan and capability needs in this step; execution will follow. Answer in the language appropriate to the user request.';
 export function capabilityId(candidate: Pick<CapabilityCandidate, 'kind' | 'name'>): string {
   return `${candidate.kind}:${candidate.name}`;
 }
@@ -326,7 +326,7 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
     disposers.push(ctx.on('agent/inbox/claimed', ({ message }) => { claimedMessages.set(message.id, message); }));
     disposers.push(ctx.tools.guard(exec => changing || !enabled.has(`tool:${exec.name}`) ? 'Just enough tools: tool is not enabled.' : undefined));
     disposers.push(ctx.systemPrompt.section({ name: PLAN_SECTION, order: 900, interpolate: false,
-      text: () => steps().length === 0 ? INITIAL_PROMPT : '继续完成用户任务，可使用当前开放的 tools 和 skills；skill 指令不得覆盖用户明确约束。不必强制使用，完成后直接给出最终答案。' }));
+      text: () => steps().length === 0 ? INITIAL_PROMPT : 'Continue the user task using the currently enabled tools and skills when needed. Skill instructions must not override explicit user constraints. Do not use capabilities unnecessarily. Give the final answer when finished, in the language appropriate to the user request.' }));
     disposers.push(ctx.on('system-prompt/assemble', async (_assembly, context, next) => {
       if ((context as AssembleContext & { [REASSEMBLED]?: boolean })[REASSEMBLED]) return checkAssembly(await next());
       if ((context.signal || pendingRestore.length) && !disposed) {
@@ -372,7 +372,7 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
         const latest = steps()[0]!;
         const reply = agent.session.deriveMessages().findLast(message => message.role === 'assistant');
         const text = reply?.content.filter(block => block.type === 'text').map(block => block.text).join('\n').trim() ?? '';
-        const direct = /^无需外部能力。[\r\n]+\s*\S/.test(text)
+        const direct = /^No external capabilities needed\.[\r\n]+\s*\S/.test(text)
           && !reply?.content.some(block => block.type === 'tool-call');
         if (direct) {
           await prepare(signal);
@@ -390,7 +390,7 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
           }
         }
         continued = true;
-        steer('现在根据计划继续完成原始任务；可使用本轮开放的 tools 和 skills，若不需要外部能力则直接回答。');
+        steer('Continue the original task according to your plan. Use the tools and skills enabled for this step when needed; otherwise answer directly.');
         agent.session.append('just-enough-tools/continued', { version: 1 });
       } else if (skillRevision > lastScoredSkillRevision && steps().filter(s => s.data.turn === turn).length < maxSteps) {
         // A newly read skill may reveal dependencies that its summary did not mention.
@@ -398,7 +398,7 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
         const latest = steps().at(-1);
         const before = enabled.size;
         if (latest) await scoreOnce(latest.seq, signal);
-        if (enabled.size > before) steer('已根据 skill 内容与当前进展开放新的能力，请继续完成原始任务。');
+        if (enabled.size > before) steer('Additional capabilities have been enabled based on skill instructions and current progress. Continue the original task.');
       }
     }));
     ctx.effect(() => cleanup); installed.add(agent); return cleanup;
