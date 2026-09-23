@@ -9,6 +9,7 @@ import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots
 
 const en = {
   title: 'Just enough tools', description: 'Configure Jev to select tools and skills in Just enough tools mode.',
+  debug: 'Routing diagnostics in the dsh terminal',
   protocol: 'Provider API protocol', providerHint: 'Choose the provider protocol. Leave URL and model blank to use its defaults; custom compatible endpoints are supported. Use the API key from that provider.',
   apiKey: 'Provider API key', keySet: 'A key is saved.', keyUnset: 'No key is saved. Set JEV_API_KEY, or AI_GATEWAY_API_KEY for Vercel / TYPESAFE_API_KEY for System One.',
   keyHint: 'Leave blank to keep the saved key. Saved keys are not returned to this page.',
@@ -19,6 +20,7 @@ const en = {
 };
 const zh: Record<keyof typeof en, string> = {
   title: 'Just enough tools', description: '配置 Jev，在 Just enough tools 模式中统一选择 tools 与 skills。',
+  debug: '在 dsh 启动终端显示逐项评分和开放结果',
   protocol: '提供商接口协议', providerHint: '选择提供商协议。地址和模型留空使用对应默认值，也可填写兼容接口的自定义地址。请使用该提供商的 API Key。',
   apiKey: '提供商 API Key', keySet: '已保存密钥。', keyUnset: '尚未保存密钥。可设置 JEV_API_KEY，或使用 Vercel 的 AI_GATEWAY_API_KEY / System One 的 TYPESAFE_API_KEY。',
   keyHint: '留空保留已保存密钥；页面不会读取或显示已有密钥。',
@@ -29,7 +31,7 @@ const zh: Record<keyof typeof en, string> = {
 };
 type TextKey = keyof typeof en;
 declare module '@deepseek-ai/dsh-client-ui-slots' { interface LocaleNamespaceMap { 'just-enough-tools.ui': TextKey } }
-interface Values { protocol?: 'systemone' | 'vercel'; baseUrl?: string; model?: string; threshold?: number; maxSteps?: number; scoreTimeoutMs?: number }
+interface Values { debug?: boolean; protocol?: 'systemone' | 'vercel'; baseUrl?: string; model?: string; threshold?: number; maxSteps?: number; scoreTimeoutMs?: number }
 type CardProps = PropsRuntime<'plugins.bundle.config'> & PropsLocale<'just-enough-tools.ui'> & {
   scope: ConfigForm<Values>; mirror: SettingsDescribeFace;
 };
@@ -66,7 +68,7 @@ export function JustEnoughToolsCard({ scope, mirror, t, view }: CardProps) {
     try {
       const accepted = await scope.mutate(Object.entries(draft).map(([key, value]) => ({
         ...(key === 'apiKey' && value === '' ? { op: 'unset' as const, path: [key] }
-          : { op: 'set' as const, path: [key], value: numeric.has(key) ? Number(value) : value }),
+          : { op: 'set' as const, path: [key], value: key === 'debug' ? value === 'true' : numeric.has(key) ? Number(value) : value }),
       })), revision.current);
       if (accepted) { setDraft({}); setStatus('saved'); } else setStatus('failed');
     } catch { setStatus('failed'); }
@@ -99,6 +101,10 @@ export function JustEnoughToolsCard({ scope, mirror, t, view }: CardProps) {
     h('small', { role: 'status' }, t(configured ? 'keySet' : 'keyUnset'), ' ', t('keyHint')),
     h('button', { type: 'button', style: buttonStyle, disabled, onClick: () => { revision.current = snapshot.revision; setDraft(old => ({ ...old, apiKey: '' })); setStatus('idle'); } }, t('clear')),
     field('baseUrl', 'baseUrl', 'url'), field('model', 'model'),
+    h('label', null, h('input', { type: 'checkbox', disabled,
+      checked: draft.debug !== undefined ? draft.debug === 'true' : values.debug ?? true,
+      onChange: (event: React.ChangeEvent<HTMLInputElement>) => edit('debug', String(event.target.checked)),
+    }), ' ', t('debug')),
     field('threshold', 'threshold', 'number'), field('maxSteps', 'maxSteps', 'number'), field('scoreTimeoutMs', 'timeout', 'number'),
     !snapshot.writable ? h('p', null, t('readonly')) : null,
     h('div', { style: { display: 'flex', gap: 12 } },

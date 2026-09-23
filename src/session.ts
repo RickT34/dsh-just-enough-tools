@@ -27,6 +27,8 @@ export function apply(ctx: Context): void {
       maxSteps: settings.config.maxSteps.get(),
       scoreTimeoutMs: settings.config.scoreTimeoutMs.get(),
       inheritedGuidance: true,
+      debug: () => settings.config.debug.get(),
+      failOnRoutingError: true,
     });
     settings.track(agent, stop);
     return true;

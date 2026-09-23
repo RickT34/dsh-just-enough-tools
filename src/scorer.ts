@@ -196,6 +196,6 @@ export class JevScorer implements Scorer {
     if (usage && usage.input_tokens !== undefined && usage.output_tokens !== undefined) {
       usage.total_tokens = usage.input_tokens + usage.output_tokens;
     }
-    return { scores, ...(typeof data.model === 'string' ? { model: data.model } : {}), ...(usage ? { usage } : {}) };
+    return { scores, model: typeof data.model === 'string' ? data.model : this.model, ...(usage ? { usage } : {}) };
   }
 }

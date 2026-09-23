@@ -60,7 +60,7 @@ npm pack
 安装到 dsh 的 Web profile：
 
 ```sh
-npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.4.2.tgz
+npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.4.3.tgz
 ```
 
 重新启动 dsh Web 进程（`npx @deepseek-ai/dsh@0.1.7-alpha.1 web`），然后：
@@ -130,6 +130,20 @@ dsh plugin --profile web remove dsh-just-enough-tools
 ```
 
 能力管理和模式生命周期见[插件接入说明](docs/integration.md)。
+
+## 查看评分与排查未开放工具
+
+插件设置中的**在 dsh 启动终端显示逐项评分和开放结果**默认开启，开关保存后立即生效。在启动 `dsh web` 的终端搜索 `[Just enough tools]`，即可看到评分开始，以及每轮的候选 ID、原始分数、阈值、新增能力和当前已开放能力；日志带有 session ID，方便区分并发对话。评分不会写入模型提示词，也不额外调用 API。
+
+例如，阈值为 `0.5` 时，`tool:read = 0.82` 会显示 `opened`，`skill:debug = 0.5` 会显示 `below-or-equal-threshold`。若所有分数都未过阈值，结果为 `none-above-threshold`；无剩余候选会显示 `no remaining candidates`。
+
+- `HTTP_401` / `HTTP_403`：检查当前提供商与密钥是否匹配。
+- `HTTP_404`：检查协议、地址和模型；Vercel 默认地址为 `https://ai-gateway.vercel.sh/v4/ai`。
+- `HTTP_429`：检查提供商额度或限流。
+- `NETWORK_ERROR` / `ROUTING_TIMEOUT`：检查网络或调整超时。
+- `REGISTRATION_FAILED`：加载 skill 或注册工具失败，本批能力全部回滚。
+
+评分或注册失败会停止当前执行并显示明确错误，不再静默进入无工具回答。修复配置后可重试。原始评分决策仍保存在会话的 `just-enough-tools/decision` 事件中。日志不输出 API Key、任务正文、skill 指令或提供商原始响应。
 
 ## 一起把它做好
 

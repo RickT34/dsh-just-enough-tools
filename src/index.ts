@@ -8,6 +8,7 @@ import type { ToolDefinition } from '@deepseek-ai/dsh-tools';
 import { jevConfigFromEnv, JevScorer, ScorerError, validateScores } from './scorer.js';
 import type { CapabilitySummary, Scorer, ScoringResult } from './scorer.js';
 export * from './scorer.js';
+import { decisionSummary, routingErrorHint } from './diagnostics.js';
 
 export const name = 'just-enough-tools';
 export const inject = ['agents', 'tools', 'systemPrompt'];
@@ -33,6 +34,9 @@ export interface Config {
   discoverSkills?: (signal: AbortSignal) => Promise<SkillCatalogSnapshot>;
   scorer?: Scorer;
   inheritedGuidance?: boolean;
+  /** Read on each decision, so the plugin settings toggle applies immediately. */
+  debug?: () => boolean;
+  failOnRoutingError?: boolean;
   threshold?: number;
   maxSteps?: number;
   /** Bounds each discovery, scoring or instruction-loading operation. */
@@ -88,7 +92,7 @@ async function bounded<T>(work: (signal: AbortSignal) => Promise<T>, signal: Abo
   const aborted = new Promise<never>((_, reject) => { rejectAbort = reject; });
   const abort = () => rejectAbort?.(combined.reason);
   combined.addEventListener('abort', abort, { once: true });
-  const timer = setTimeout(() => control.abort(new Error('Routing deadline exceeded.')), ms);
+  const timer = setTimeout(() => control.abort(new ScorerError('ROUTING_TIMEOUT')), ms);
   try { combined.throwIfAborted(); return await Promise.race([work(combined), aborted]); }
   finally { clearTimeout(timer); combined.removeEventListener('abort', abort); }
 }
@@ -223,7 +227,10 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
           discovered.add(capabilityId(skill));
         }
         catalogComplete = snapshot.complete;
-      } catch { signal.throwIfAborted(); catalogComplete = false; }
+      } catch {
+        signal.throwIfAborted(); catalogComplete = false;
+        ctx.logger.warn(`[Just enough tools] session=${agent.session.id} SKILL_DISCOVERY_FAILED: keeping last-known candidates.`);
+      }
     }
     if (pendingRestore.length) {
       if (pendingRestore.some(id => !catalog.has(id))) throw new Error('Resumed session references unavailable skills.');
@@ -237,8 +244,13 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
   const prepare = (signal: AbortSignal) => preparation ??= refresh(signal).finally(() => { preparation = undefined; });
   const scoreStep = async (afterStepSeq: number, signal: AbortSignal) => {
     const candidates = remaining();
-    if (!candidates.length) { lastScored = afterStepSeq; lastScoredSkillRevision = skillRevision; return; }
+    if (!candidates.length) {
+      lastScored = afterStepSeq; lastScoredSkillRevision = skillRevision;
+      if (config.debug?.()) ctx.logger.info(`[Just enough tools] session=${agent.session.id} no remaining candidates; enabled=${JSON.stringify([...enabled])}; catalogComplete=${catalogComplete}`);
+      return;
+    }
     const started = Date.now();
+    if (config.debug?.()) ctx.logger.info(`[Just enough tools] session=${agent.session.id} scoring ${JSON.stringify(candidates)}; threshold=${threshold}; catalogComplete=${catalogComplete}`);
     let result: ScoringResult, status: Decision['status'] = 'ok', errorCode: string | undefined;
     let added: string[] = [];
     try {
@@ -265,15 +277,24 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
     if (status === 'ok') {
       added = candidates.filter(id => result.scores[id]! > threshold);
       try { await admit(added, signal); }
-      catch { signal.throwIfAborted(); status = 'registration-error'; added = []; }
+      catch (error) { signal.throwIfAborted(); status = 'registration-error';
+        errorCode = error instanceof ScorerError ? error.code : 'REGISTRATION_FAILED'; added = []; }
     }
     lastScored = afterStepSeq;
-    agent.session.append('just-enough-tools/decision', {
+    const decision: Decision = {
       version: 2, afterStepSeq, threshold, candidates, enabled: [...enabled], added,
       capabilities: [...catalog.values()].map(c => ({ id: capabilityId(c), kind: c.kind, name: c.name })),
       catalogComplete, scores: result.scores, status, durationMs: Date.now() - started,
       ...(errorCode ? { errorCode } : {}), ...(result.model ? { model: result.model } : {}), ...(result.usage ? { usage: result.usage } : {}),
-    });
+    };
+    agent.session.append('just-enough-tools/decision', decision);
+    if (config.debug?.() || status !== 'ok') {
+      const line = `[Just enough tools] session=${agent.session.id} ${decisionSummary(decision)}`;
+      if (status === 'ok') ctx.logger.info(line); else ctx.logger.warn(line);
+    }
+    if (status !== 'ok' && config.failOnRoutingError) {
+      throw new Error(`Just enough tools: ${errorCode}. ${routingErrorHint(errorCode)} Open Plugins > dsh-just-enough-tools and check the dsh terminal for routing diagnostics.`);
+    }
   };
   const scoreOnce = (seq: number, signal: AbortSignal) => scoring ??= scoreStep(seq, signal).finally(() => { scoring = undefined; });
   const steer = (text: string) => agent.steer(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'just-enough-tools' } }));

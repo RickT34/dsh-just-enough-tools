@@ -39,3 +39,5 @@ API key, URL and model changes apply to the next scoring call. Start a new conve
 Gateway protocol reference: [official evaluation adapter](https://github.com/vercel/ai/blob/main/packages/gateway/src/gateway-evaluation-model.ts).
 
 API reference: [TypeSafe System One](https://docs.typesafe.ai/api), [Noul](https://docs.typesafe.ai/primitives/noul).
+
+The mode enables terminal diagnostics by default (`debug` setting, live). Scoring and registration failures persist a decision then raise a redacted actionable error to the agent UI; a successful all-low-score decision continues normally. Diagnostic data never enters the model prompt.

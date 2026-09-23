@@ -12,6 +12,7 @@ export const name = 'just-enough-tools-settings';
 export const inject = ['agents'];
 
 export interface Config {
+  debug: Volatile<boolean>;
   protocol: Volatile<JevProtocol>;
   apiKey: Volatile<string | undefined>;
   baseUrl: Volatile<string>;
@@ -22,6 +23,7 @@ export interface Config {
 }
 
 export const Config = z.object({
+  debug: z.boolean().default(true).volatile(),
   protocol: z.union(['systemone', 'vercel']).default('systemone').volatile(),
   apiKey: z.string().role('secret').volatile(),
   baseUrl: z.string().default('').volatile(),
