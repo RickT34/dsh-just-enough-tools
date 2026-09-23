@@ -60,7 +60,7 @@ npm pack
 Install it into your dsh Web profile:
 
 ```sh
-npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.4.3.tgz
+npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.5.0.tgz
 ```
 
 Restart your dsh Web process (`npx @deepseek-ai/dsh@0.1.7-alpha.1 web`), then:
@@ -108,6 +108,12 @@ In **Plugins → dsh-just-enough-tools**, select **Vercel AI Gateway (Evaluation
 You can also set `JEV_API_KEY` for either protocol. A saved key takes priority, followed by `JEV_API_KEY`, then the matching provider variable. When switching providers, replace the saved key or reset it to use the environment variable; clear any old URL/model overrides to use the new defaults.
 
 For another provider or a self-hosted proxy, choose its compatible protocol and enter its base URL, API key and Jev model ID. Full endpoints are also accepted. System One uses `/systemone` with Noul answers; Vercel uses `/evaluation-model` with boolean probabilities, matching the [AI SDK evaluation interface](https://vercel.com/docs/ai-gateway/sdks-and-apis/ai-sdk). An OpenAI-compatible chat endpoint alone does not supply this evaluation protocol.
+
+### OpenAI-compatible providers / LM Studio
+
+Select **OpenAI-compatible / LM Studio (Chat scoring)**, use `http://127.0.0.1:1234/v1`, and enter the actual model ID from LM Studio's `/v1/models`. Leave the key blank for an unauthenticated local server. Remote providers can use their own key or `OPENAI_API_KEY` (overridden by `JEV_API_KEY`).
+
+This mode requires Chat Completions JSON such as `{"scores":{"tool:read":0.9,"skill:debug":0.2}}`. Values are chat-model estimates, not native Jev/Laya decision probabilities. The same threshold applies. Missing/unknown IDs, invalid scores, truncation and malformed JSON fail closed. There is no automatic fallback from Jev to chat scoring.
 
 ### Settings
 

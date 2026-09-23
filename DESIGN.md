@@ -9,3 +9,5 @@ Each agent owns a monotonic enabled set. Metadata discovery refreshes skills bet
 Decision events record capability IDs and kinds. Replay migrates legacy tool-only IDs and restores selected skills before continuing. Full native skill catalogs and native invocation injections are suppressed in Just enough tools mode; skill selection is not a filesystem sandbox.
 
 See [the README](README.md) for the flow and [integration details](docs/integration.md) for lifecycle requirements. Jev handles selection; dsh provides the acting model and tool runtime.
+
+OpenAI-compatible chat scoring is an explicit alternative protocol: it requests one JSON score per candidate and rejects incomplete or invalid outputs. These values are model estimates, not calibrated native decision probabilities. Encoder-only Laya GGUF cannot generate that chat response; it requires its separate decision head.

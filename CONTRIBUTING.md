@@ -6,7 +6,7 @@ Help make selective tool exposure useful in real agents. Good first contribution
 
 Use Node.js 22.19 or newer, then run `npm ci`, `npm test`, `npm run typecheck`, and `npm run build`. The Web bundle registers an independent preset and a configuration card. Routing internals live in `src/`, and the settings page lives in `client/`. Client code builds as a dsh module-loader closure and shares the host React runtime.
 
-The test suite uses local HTTP responses and real Harness components; no API key is required. Jev is the only bundled scoring backend. The acting model is provided by dsh.
+The test suite uses local HTTP responses and real Harness components; no API key is required. Scoring supports native System One, Vercel Evaluation, and explicitly selected OpenAI-compatible chat estimates. The acting model is provided by dsh.
 
 Keep changes focused. Add a behavior test when changing capability exposure, cancellation, registration, skill loading, or response parsing. A scorer response must never partially admit a mixed batch of tools and skills. Preserve agent isolation and existing execution guards.
 

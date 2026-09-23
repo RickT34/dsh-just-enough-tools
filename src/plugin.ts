@@ -24,7 +24,7 @@ export interface Config {
 
 export const Config = z.object({
   debug: z.boolean().default(true).volatile(),
-  protocol: z.union(['systemone', 'vercel']).default('systemone').volatile(),
+  protocol: z.union(['systemone', 'vercel', 'openai']).default('systemone').volatile(),
   apiKey: z.string().role('secret').volatile(),
   baseUrl: z.string().default('').volatile(),
   model: z.string().default('').volatile(),
@@ -56,7 +56,7 @@ export function apply(ctx: Context, config: Config): void {
     scorer() {
       const protocol = config.protocol.get();
       const apiKey = config.apiKey.get() || jevApiKeyFromEnv(protocol);
-      if (!apiKey) throw new Error('Configure the Jev API key in Plugins > dsh-just-enough-tools before using Just enough tools mode.');
+      if (protocol !== 'openai' && !apiKey) throw new Error('Configure the Jev API key in Plugins > dsh-just-enough-tools before using Just enough tools mode.');
       return new JevScorer({ protocol, apiKey, baseUrl: config.baseUrl.get(), model: config.model.get(), timeoutMs: config.scoreTimeoutMs.get() });
     },
   } satisfies ModeSettings);

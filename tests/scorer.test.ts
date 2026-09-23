@@ -183,3 +183,45 @@ test('provider environment configuration never borrows credentials from another 
   assert.equal(jevConfigFromEnv({ JEV_PROTOCOL: 'vercel', JEV_API_KEY: 'custom', AI_GATEWAY_API_KEY: 'gateway',
     JEV_BASE_URL: 'https://example.test/custom', JEV_MODEL: 'custom-jev' }).apiKey, 'custom');
 });
+
+test('OpenAI-compatible chat scoring supports unauthenticated local servers and exact candidate IDs', async () => {
+  let request: { url: string; headers: Headers; body: any } | undefined;
+  const result = await new JevScorer({ protocol: 'openai', model: 'local-chat', fetch: async (url, init) => {
+    request = { url: String(url), headers: new Headers(init?.headers), body: JSON.parse(String(init?.body)) };
+    return new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ scores: {
+      'tool:read': 0.9, 'tool:write': 0.1,
+    } }) } }], usage: { prompt_tokens: 200, completion_tokens: 20 } }));
+  } }).score(input, new AbortController().signal);
+  assert.equal(request?.url, 'http://127.0.0.1:1234/v1/chat/completions');
+  assert.equal(request?.headers.has('authorization'), false);
+  assert.equal(request?.body.model, 'local-chat');
+  assert.equal(request?.body.stream, false);
+  assert.deepEqual(JSON.parse(request?.body.messages[1].content).candidates, input.candidates);
+  assert.deepEqual(result.scores, { 'tool:read': 0.9, 'tool:write': 0.1 });
+  assert.deepEqual(result.usage, { input_tokens: 200, output_tokens: 20, total_tokens: 220 });
+});
+
+test('chat scoring rejects truncation, missing scores, invented IDs and malformed JSON', async () => {
+  for (const [finish, content] of [
+    ['length', '{"scores":{"tool:read":0.9,"tool:write":0.1}}'],
+    ['stop', '{"scores":{"tool:read":0.9}}'],
+    ['stop', '{"scores":{"tool:read":0.9,"tool:write":0.1,"invented":1}}'],
+    ['stop', '{"scores":{"tool:read":"0.9","tool:write":0.1}}'],
+    ['stop', '```json\n{"scores":{}}\n```'],
+  ]) {
+    await assert.rejects(new JevScorer({ protocol: 'openai', model: 'local', fetch: mockResponse({
+      choices: [{ finish_reason: finish, message: { content } }],
+    }) }).score(input, new AbortController().signal));
+  }
+  await assert.rejects(new JevScorer({ protocol: 'openai', model: 'encoder',
+    fetch: mockResponse({ error: 'logits unavailable' }),
+  }).score(input, new AbortController().signal), { message: 'INVALID_CHAT_RESPONSE' });
+});
+
+test('chat protocol requires an explicit model and does not borrow the Vercel key', () => {
+  assert.throws(() => new JevScorer({ protocol: 'openai' }), /model ID/);
+  const config = jevConfigFromEnv({ JEV_PROTOCOL: 'openai', JEV_MODEL: 'local', AI_GATEWAY_API_KEY: 'not-for-local' });
+  assert.equal(config.apiKey, undefined);
+  assert.equal(config.protocol, 'openai');
+  assert.equal(jevConfigFromEnv({ JEV_PROTOCOL: 'openai', OPENAI_API_KEY: 'chat-key' }).apiKey, 'chat-key');
+});

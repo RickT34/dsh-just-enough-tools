@@ -18,6 +18,7 @@ export function decisionSummary(decision: Decision): string {
 }
 
 export function routingErrorHint(code?: string): string {
+  if (code?.includes('CHAT')) return 'The chat scorer must generate complete JSON scores. Encoder-only Laya GGUF in LM Studio cannot do this; use a generative model or serve Laya with its decision head through System One.';
   if (code === 'HTTP_401' || code === 'HTTP_403') return 'Check the selected provider and its API key.';
   if (code === 'HTTP_404') return 'Check the API protocol, base URL and model ID. Vercel defaults: /v4/ai and typesafe-ai/jev.';
   if (code === 'HTTP_429') return 'Provider rate or quota limit reached; check provider usage and retry later.';

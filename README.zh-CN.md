@@ -60,7 +60,7 @@ npm pack
 安装到 dsh 的 Web profile：
 
 ```sh
-npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.4.3.tgz
+npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.5.0.tgz
 ```
 
 重新启动 dsh Web 进程（`npx @deepseek-ai/dsh@0.1.7-alpha.1 web`），然后：
@@ -108,6 +108,13 @@ npx @deepseek-ai/dsh@0.1.7-alpha.1 web
 两种协议也都支持 `JEV_API_KEY`。优先使用页面保存的密钥，其次是 `JEV_API_KEY`，最后是对应提供商的环境变量。切换提供商时，请更换保存的密钥，或重置后使用环境变量；清空旧地址和模型覆盖值，即可使用新协议的默认值。
 
 接入其他提供商或自建代理时，选择其兼容协议，再填写 API 地址、密钥与 Jev 模型 ID；地址也可以填写完整端点。System One 通过 `/systemone` 返回 Noul；Vercel 通过 `/evaluation-model` 返回 boolean probability，与 [AI SDK 的 evaluation 接口](https://vercel.com/docs/ai-gateway/sdks-and-apis/ai-sdk) 一致。仅支持 OpenAI Chat Completions 的端点不具备这一评估协议。
+
+### OpenAI 兼容接口 / LM Studio
+
+选择 **OpenAI-compatible / LM Studio (Chat scoring)**，地址填写 `http://127.0.0.1:1234/v1`，模型填写 LM Studio 的 `/v1/models` 返回的实际 ID。本地服务未开启鉴权时密钥可留空；远程服务使用对应密钥，也支持 `OPENAI_API_KEY`（优先级低于 `JEV_API_KEY`）。
+
+此模式要求模型通过 Chat Completions 生成 `{"scores":{"tool:read":0.9,"skill:debug":0.2}}`。分数是聊天模型估计值，不是 Jev/Laya 的原生决策概率；仍使用相同阈值。缺项、未知 ID、越界、截断和非 JSON 输出均会报错，不会悄悄开放工具。不会自动从 Jev 切换为聊天评分。
+
 
 ### 页面设置
 
