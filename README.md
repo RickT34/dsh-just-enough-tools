@@ -33,6 +33,8 @@ flowchart TD
 
 Skills are not hidden behind another tool-selection step. They can be selected without any tool, or alongside tools in the same batch. A newly loaded workflow can reveal a need for additional capabilities, which Jev can select next.
 
+Simple tasks can finish in the first response. The Agent must start with the standalone declaration `无需外部能力。` and provide a complete answer. The scorer still checks the candidates: only a complete catalog and successful scores **strictly below the threshold** allow skipping the second model call. A plan alone, a declaration without an answer, a score equal to the threshold, or a scoring failure does not qualify. Later user tasks are scored again.
+
 ### Example: fix a login bug
 
 > “Fix the login error and run the tests.”
@@ -60,7 +62,7 @@ npm pack
 Install it into your dsh Web profile:
 
 ```sh
-npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.5.0.tgz
+npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.5.1.tgz
 ```
 
 Restart your dsh Web process (`npx @deepseek-ai/dsh@0.1.7-alpha.1 web`), then:

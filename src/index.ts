@@ -63,6 +63,7 @@ declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
     'just-enough-tools/decision': Decision;
     'just-enough-tools/continued': { version: 1 };
+    'just-enough-tools/direct-answer': { version: 1; afterStepSeq: number };
   }
 }
 declare module '@deepseek-ai/dsh-llm' {
@@ -75,7 +76,7 @@ declare module '@deepseek-ai/dsh-llm' {
 const REASSEMBLED = Symbol('just-enough-tools-reassembled');
 const PLAN_SECTION = 'just-enough-tools:phase';
 const installed = new WeakSet<Agent>();
-const INITIAL_PROMPT = '先独立分析用户任务，给出简短计划，并说明完成任务可能需要哪些外部操作能力或专业工作流程。无需猜测具体工具或 skill 名称。本轮只给计划和能力需求，下一轮再执行任务或给出最终答案。';
+const INITIAL_PROMPT = '先独立分析用户任务，给出简短计划，并说明完成任务可能需要哪些外部操作能力或专业工作流程。无需猜测具体工具或 skill 名称。如果无需任何外部工具或 skill 就能完整回答，请直接给出最终答案，并以独立首行“无需外部能力。”明确声明，后面必须包含完整答案。如果仍需外部能力，本轮只给计划和能力需求，下一轮再执行。';
 export function capabilityId(candidate: Pick<CapabilityCandidate, 'kind' | 'name'>): string {
   return `${candidate.kind}:${candidate.name}`;
 }
@@ -127,6 +128,7 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
   const discovered = new Set<string>();
   const claimedMessages = new Map<string, UserMessage>();
   const lifetime = new AbortController();
+  let lastScoredTurn = -1;
   let lastScored = -1, skillRevision = 0, lastScoredSkillRevision = 0;
   let continued = false, disposed = false, changing = false, catalogComplete = true;
   let scoring: Promise<void> | undefined;
@@ -243,6 +245,7 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
   };
   const prepare = (signal: AbortSignal) => preparation ??= refresh(signal).finally(() => { preparation = undefined; });
   const scoreStep = async (afterStepSeq: number, signal: AbortSignal) => {
+    lastScoredTurn = agent.session.snapshotEvents().findLast(e => e.type === 'turn/start')?.seq ?? -1;
     const candidates = remaining();
     if (!candidates.length) {
       lastScored = afterStepSeq; lastScoredSkillRevision = skillRevision;
@@ -319,7 +322,7 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
       if (tools.length + pendingRestore.length !== ids.length) throw new Error('Invalid restored capability IDs.');
       lastScored = prior.afterStepSeq;
     }
-    continued = agent.session.snapshotEvents().some(e => e.type === 'just-enough-tools/continued');
+    continued = agent.session.snapshotEvents().some(e => e.type === 'just-enough-tools/continued' || e.type === 'just-enough-tools/direct-answer');
     disposers.push(ctx.on('agent/inbox/claimed', ({ message }) => { claimedMessages.set(message.id, message); }));
     disposers.push(ctx.tools.guard(exec => changing || !enabled.has(`tool:${exec.name}`) ? 'Just enough tools: tool is not enabled.' : undefined));
     disposers.push(ctx.systemPrompt.section({ name: PLAN_SECTION, order: 900, interpolate: false,
@@ -333,7 +336,8 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
         const latest = completed.at(-1);
         const latestTurn = agent.session.snapshotEvents().findLast(e => e.type === 'turn/start');
         const inTurn = completed.filter(e => e.seq > (latestTurn?.seq ?? -1)).length;
-        if (context.signal && latest && latest.seq > lastScored && inTurn < maxSteps) {
+        if (context.signal && latest && (latest.seq > lastScored
+          || (latestTurn && latestTurn.seq > latest.seq && latestTurn.seq !== lastScoredTurn)) && inTurn < maxSteps) {
           await scoreOnce(latest.seq, signal); rebuild = true;
         }
         signal.throwIfAborted();
@@ -365,6 +369,26 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
     disposers.push(ctx.on('agent/turn-stopping', async ({ signal, turn }) => {
       signal = AbortSignal.any([signal, lifetime.signal]); signal.throwIfAborted();
       if (!continued && steps().length === 1) {
+        const latest = steps()[0]!;
+        const reply = agent.session.deriveMessages().findLast(message => message.role === 'assistant');
+        const text = reply?.content.filter(block => block.type === 'text').map(block => block.text).join('\n').trim() ?? '';
+        const direct = /^无需外部能力。[\r\n]+\s*\S/.test(text)
+          && !reply?.content.some(block => block.type === 'tool-call');
+        if (direct) {
+          await prepare(signal);
+          if (latest.seq > lastScored) await scoreOnce(latest.seq, signal);
+          signal.throwIfAborted();
+          const event = agent.session.snapshotEvents().findLast(e => e.type === 'just-enough-tools/decision');
+          const belowThreshold = remaining().length === 0 && enabled.size === 0
+            || (event?.type === 'just-enough-tools/decision' && event.data.afterStepSeq === latest.seq
+              && event.data.status === 'ok' && event.data.candidates.every(id => event.data.scores[id]! < threshold));
+          if (catalogComplete && enabled.size === 0 && belowThreshold) {
+            continued = true;
+            agent.session.append('just-enough-tools/direct-answer', { version: 1, afterStepSeq: latest.seq });
+            if (config.debug?.()) ctx.logger.info(`[Just enough tools] session=${agent.session.id} direct-answer accepted; skipped second model call.`);
+            return;
+          }
+        }
         continued = true;
         steer('现在根据计划继续完成原始任务；可使用本轮开放的 tools 和 skills，若不需要外部能力则直接回答。');
         agent.session.append('just-enough-tools/continued', { version: 1 });

@@ -2,7 +2,7 @@
 
 Validated against DeepSeek Harness `0.1.7-alpha.1` / Cordis `4.0.3`.
 
-- 58 automated tests pass with real Harness components and local HTTP fixtures. The mode tests verify that only Just enough tools agents start without capabilities, the configured Jev endpoint drives registration, ordinary agents remain usable without a Jev key, and blank conversations can switch into and out of the mode.
+- 66 automated tests pass with real Harness components and local HTTP fixtures. The mode tests verify that only Just enough tools agents start without capabilities, the configured Jev endpoint drives registration, ordinary agents remain usable without a Jev key, and blank conversations can switch into and out of the mode.
 - Skill tests cover same-name tool/skill separation, one shared threshold, skill-only admission, user-role instruction injection, mixed-batch rollback, cancellation/timeout, replay, dynamic discovery, invocation policy, and filesystem resource hints.
 - Host and browser TypeScript checks pass. The browser bundle uses dsh's module-loader contract and the host React runtime.
 - Before the package rename, installed v0.4.0 with the real `dsh plugin --profile web add` command in an isolated profile and verified successful Web startup with the skill filesystem provider in the composed preset. Mode selection and settings interactions below were checked in the actual Web interface on v0.3.0; v0.4.0 changes the threshold label to include skills.
@@ -22,3 +22,5 @@ Version 0.4.2 gates static native `tool:<name>` guidance by candidate admission,
 Version 0.4.3 adds terminal routing diagnostics and stops the dsh mode on scoring/registration errors after persisting the decision. Tests distinguish low scores from provider failure, expose safe error codes, preserve rollback, and verify exact per-candidate scores and threshold outcomes. Live Vercel scoring and the browser diagnostics toggle remain unverified; no paid calls were made.
 
 Version 0.5.0 adds explicit OpenAI-compatible chat scoring, including unauthenticated local servers, required model IDs, strict complete-score validation, usage normalization, and real Harness routing via local HTTP fixtures. A live request to LM Studio with weidows/laya-multilingual failed with a logits-computation error, consistent with the model card identifying an encoder-only GGUF and a separate decision head. This does not establish working native Laya inference or scoring quality. No other local model was loaded for testing.
+
+Version 0.5.1 tests first-response completion with explicit no-capability declaration, strict-below-threshold scores, no duplicate scoring, high/equal scores, missing answers, scorer failure, incomplete discovery, and renewed scoring for a later task. 66 tests, type checks and build pass. This validates control flow, not answer correctness or live-model compliance with the declaration.

@@ -33,6 +33,8 @@ flowchart TD
 
 Skill 本身就是候选，不需要先选中某个“加载 skill 的工具”。它可以单独获选，也可以和工具在同一批开放。新加载的工作流程如果透露了更多能力需求，Jev 会在后续补充选择。
 
+简单问题可以在首轮直接回答：Agent 以独立首行“无需外部能力。”声明，并给出完整答案。评分器仍会检查候选；只有目录完整、评分成功且所有候选分数**严格低于阈值**时，插件才保留首轮答案并跳过第二次模型调用。仅给计划、未给答案、分数等于阈值或评分失败都不会提前结束。后续新任务仍会重新评分。
+
 ### 例子：修复登录问题
 
 > “修复登录报错，并运行测试。”
@@ -60,7 +62,7 @@ npm pack
 安装到 dsh 的 Web profile：
 
 ```sh
-npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.5.0.tgz
+npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.5.1.tgz
 ```
 
 重新启动 dsh Web 进程（`npx @deepseek-ai/dsh@0.1.7-alpha.1 web`），然后：
