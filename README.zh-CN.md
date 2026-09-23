@@ -60,13 +60,13 @@ npm pack
 安装到 dsh 的 Web profile：
 
 ```sh
-dsh plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.4.0.tgz
+npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.4.1.tgz
 ```
 
-重新启动 dsh Web 进程（`dsh web`），然后：
+重新启动 dsh Web 进程（`npx @deepseek-ai/dsh@0.1.7-alpha.1 web`），然后：
 
 1. 打开 **插件 → dsh-just-enough-tools**。
-2. 填写 **Jev API Key**、API 地址和模型，点击**保存**。
+2. 选择**提供商接口协议**，填写**提供商 API Key**，按需设置 API 地址和模型，点击**保存**。
 3. 新建对话，在发送第一条消息前，从模式菜单选择 **Just enough tools**。
 
 Just enough tools 与标准、PTC、极简、创造等模式并列，不改变默认模式，也不会接管普通模式的 agent。如果看不到模式菜单，可在 dsh 的通用设置中开启模式选择。
@@ -87,18 +87,41 @@ description: 诊断登录与会话异常，在修改认证代码前定位问题�
 
 Jev 最初只接收 skill 摘要；选中后，完整指令自动进入 Agent 上下文，并保留资源路径信息。不需要额外开放 `skill` 加载工具。只有允许模型调用的 skills 会参与选择；执行 skill 所需的工具仍然独立过阈值。
 
+### 启动时报缺少模式组件
+
+如果报错 `Cannot find package '@deepseek-ai/dsh-agent-preset'`，请先检查 `dsh --version`。本插件需要 **0.1.7-alpha.1**；0.1.5 的 CLI 不包含该组件。安装与启动都使用上面指定版本的命令；仅升级插件不会升级 dsh：
+
+```sh
+npx @deepseek-ai/dsh@0.1.7-alpha.1 web
+```
+
+### Vercel AI Gateway 与自定义提供商
+
+在 **插件 → dsh-just-enough-tools** 中选择 **Vercel AI Gateway (Evaluation)**，填写 Gateway API Key。地址和模型留空即可使用对应默认值：
+
+| 设置 | Vercel AI Gateway | System One / TypeSafe |
+| --- | --- | --- |
+| API 地址 | `https://ai-gateway.vercel.sh/v4/ai` | `https://api.typesafe.ai/v1` |
+| Jev 模型 | `typesafe-ai/jev` | `jev-latest` |
+| 密钥环境变量 | `AI_GATEWAY_API_KEY` | `TYPESAFE_API_KEY` |
+
+两种协议也都支持 `JEV_API_KEY`。优先使用页面保存的密钥，其次是 `JEV_API_KEY`，最后是对应提供商的环境变量。切换提供商时，请更换保存的密钥，或重置后使用环境变量；清空旧地址和模型覆盖值，即可使用新协议的默认值。
+
+接入其他提供商或自建代理时，选择其兼容协议，再填写 API 地址、密钥与 Jev 模型 ID；地址也可以填写完整端点。System One 通过 `/systemone` 返回 Noul；Vercel 通过 `/evaluation-model` 返回 boolean probability，与 [AI SDK 的 evaluation 接口](https://vercel.com/docs/ai-gateway/sdks-and-apis/ai-sdk) 一致。仅支持 OpenAI Chat Completions 的端点不具备这一评估协议。
+
 ### 页面设置
 
 | 设置 | 默认值 | 作用 |
 | --- | --- | --- |
-| Jev API Key | 未设置 | TypeSafe 密钥；也支持 `TYPESAFE_API_KEY` 环境变量兜底 |
-| Jev API 地址 | `https://api.typesafe.ai/v1` | TypeSafe System One 接口根地址 |
-| Jev 模型 | `jev-latest` | 指定 Jev 模型版本 |
+| 提供商接口协议 | `systemone` | System One 或 Vercel Evaluation，也支持兼容的自定义端点 |
+| 提供商 API Key | 未设置 | 提供商密钥；支持 `JEV_API_KEY` 或对应提供商环境变量 |
+| API 地址 | 留空：使用协议默认值 | 兼容提供商根地址或完整端点 |
+| Jev 模型 | 留空：使用协议默认值 | 提供商的 Jev 模型 ID |
 | Tool / Skill 开放阈值 | `0.5` | 两类能力共用同一阈值，严格高于才开放 |
 | 每轮对话的最大步骤 | `12` | 模型决策次数上限，包含首轮规划 |
 | 路由超时 | `60000` 毫秒 | 每次发现、评分或 skill 加载操作的等待上限 |
 
-设置通过 dsh 持久化保存。已有密钥会在设置读取时脱敏，不会回填到页面；密钥框留空保留原值，**重置已保存密钥**可移除 profile 中的覆盖值。API Key、地址和模型在下次评分生效；调整路由限制后请新建对话。
+设置通过 dsh 持久化保存。已有密钥会在设置读取时脱敏，不会回填到页面；密钥框留空保留原值，**重置已保存密钥**可移除 profile 中的覆盖值。协议、API Key、地址和模型在下次评分生效；调整路由限制后请新建对话。
 
 卸载模式：
 

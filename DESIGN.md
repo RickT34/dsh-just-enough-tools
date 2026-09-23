@@ -1,6 +1,6 @@
 # Design
 
-Just enough tools treats tools and skills as peers in one capability catalog. IDs are namespaced (`tool:name`, `skill:name`) so equal names do not collide. Jev scores every remaining candidate independently with the same Noul criterion and threshold.
+Just enough tools treats tools and skills as peers in one capability catalog. IDs are namespaced (`tool:name`, `skill:name`) so equal names do not collide. Jev scores every remaining candidate independently with the same necessity criterion (System One Noul or Vercel boolean probability) and threshold.
 
 The Agent's first step sees neither tool schemas nor skill instructions. An admitted tool is registered with its schema and guidance. An admitted skill is loaded and delivered as user-role instruction context, preserving dsh resource-base hints and literal content. Neither kind automatically admits the other. Newly revealed skill instructions can inform the next selection of dependencies.
 

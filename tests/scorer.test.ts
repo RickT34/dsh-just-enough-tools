@@ -119,3 +119,67 @@ test('a same-named skill and tool receive distinct questions in the same request
   assert.equal(payload?.questions.capability_1?.instructions.capability_kind, 'skill');
   assert.deepEqual(result.scores, { 'tool:read': 0.1, 'skill:read': 0.9 });
 });
+
+test('Vercel evaluation uses boolean probabilities, gateway headers and normalized usage', async () => {
+  let endpoint = '';
+  let headers = new Headers();
+  let body: any;
+  const scorer = new JevScorer({ protocol: 'vercel', apiKey: 'gateway-fixture', fetch: async (url, init) => {
+    endpoint = String(url); headers = new Headers(init?.headers); body = JSON.parse(String(init?.body));
+    return new Response(JSON.stringify({ answers: {
+      capability_0: { type: 'boolean', probability: 0.8 },
+      capability_1: { type: 'boolean', probability: 0.01, confidence: 0.99 },
+    }, usage: { inputTokens: 100, outputTokens: 0 } }));
+  } });
+  const result = await scorer.score(input, new AbortController().signal);
+  assert.equal(endpoint, 'https://ai-gateway.vercel.sh/v4/ai/evaluation-model');
+  assert.equal(headers.get('authorization'), 'Bearer gateway-fixture');
+  assert.equal(headers.get('ai-model-id'), 'typesafe-ai/jev');
+  assert.equal(headers.get('ai-evaluation-model-specification-version'), '4');
+  assert.equal(headers.get('ai-gateway-protocol-version'), '0.0.1');
+  assert.equal(body.model, undefined);
+  assert.equal(body.questions.capability_0.type, 'boolean');
+  assert.equal(body.questions.capability_0.instructions.capability_name, 'read');
+  assert.deepEqual(body.state.all_capabilities, input.allCapabilities);
+  assert.deepEqual(result.scores, { 'tool:read': 0.8, 'tool:write': 0.01 });
+  assert.deepEqual(result.usage, { input_tokens: 100, output_tokens: 0, total_tokens: 100 });
+});
+
+test('custom providers preserve base paths, full endpoints, credentials and model IDs', async () => {
+  for (const protocol of ['vercel', 'systemone'] as const) {
+    const suffix = protocol === 'vercel' ? 'evaluation-model' : 'systemone';
+    for (const baseUrl of ['https://example.test/custom/', `https://example.test/custom/${suffix}`]) {
+      const scorer = new JevScorer({ protocol, baseUrl, apiKey: 'custom-key', model: 'custom-jev', fetch: async (url, init) => {
+        assert.equal(String(url), `https://example.test/custom/${suffix}`);
+        const body = JSON.parse(String(init?.body));
+        const headers = new Headers(init?.headers);
+        assert.equal(headers.get('authorization'), 'Bearer custom-key');
+        assert.equal(protocol === 'vercel' ? headers.get('ai-model-id') : body.model, 'custom-jev');
+        return new Response(JSON.stringify({ answers: Object.fromEntries(Object.keys(body.questions).map(id => [id,
+          protocol === 'vercel' ? { type: 'boolean', probability: 0.7 } : { type: 'noul', noul: 0.7 },
+        ])) }));
+      } });
+      assert.deepEqual((await scorer.score(input, new AbortController().signal)).scores, { 'tool:read': 0.7, 'tool:write': 0.7 });
+    }
+  }
+});
+
+test('gateway rejects missing, malformed and out-of-range boolean probabilities', async () => {
+  for (const answer of [{ type: 'boolean' }, { type: 'boolean', probability: '0.9' },
+    { type: 'boolean', probability: -1 }, { type: 'boolean', probability: 1.1 }, { type: 'noul', noul: 0.9 }]) {
+    await assert.rejects(new JevScorer({ protocol: 'vercel', apiKey: 'fixture', fetch: mockResponse({ answers: {
+      capability_0: answer, capability_1: { type: 'boolean', probability: 0.2 },
+    } }) }).score(input, new AbortController().signal));
+  }
+});
+
+test('provider environment configuration never borrows credentials from another provider', () => {
+  assert.deepEqual(jevConfigFromEnv({ JEV_PROTOCOL: 'vercel', AI_GATEWAY_API_KEY: 'gateway' }), {
+    protocol: 'vercel', apiKey: 'gateway', baseUrl: 'https://ai-gateway.vercel.sh/v4/ai', model: 'typesafe-ai/jev',
+  });
+  assert.throws(() => jevConfigFromEnv({ JEV_PROTOCOL: 'vercel', TYPESAFE_API_KEY: 'wrong-provider' }));
+  assert.throws(() => jevConfigFromEnv({ AI_GATEWAY_API_KEY: 'wrong-provider' }));
+  assert.throws(() => jevConfigFromEnv({ JEV_PROTOCOL: 'unknown', JEV_API_KEY: 'fixture' }));
+  assert.equal(jevConfigFromEnv({ JEV_PROTOCOL: 'vercel', JEV_API_KEY: 'custom', AI_GATEWAY_API_KEY: 'gateway',
+    JEV_BASE_URL: 'https://example.test/custom', JEV_MODEL: 'custom-jev' }).apiKey, 'custom');
+});

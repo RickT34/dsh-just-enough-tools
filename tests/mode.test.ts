@@ -13,7 +13,7 @@ import { harness, ScriptedAdapter, textResponse, callResponse, run, prompt } fro
 const tools = new URL('./fixtures/preset-tools.mjs', import.meta.url).href;
 const routing = new URL('../src/session.ts', import.meta.url).href;
 
-test('only Just enough tools mode starts empty and routes through the configured Jev endpoint', async t => {
+for (const protocol of ['systemone', 'vercel'] as const) test(`only Just enough tools mode starts empty and routes through the configured ${protocol} endpoint`, async t => {
   let scoringCalls = 0;
   let authorization: string | undefined;
   const server = createServer(async (req, res) => {
@@ -22,8 +22,9 @@ test('only Just enough tools mode starts empty and routes through the configured
     for await (const chunk of req) chunks.push(chunk);
     const body = JSON.parse(Buffer.concat(chunks).toString());
     scoringCalls++;
+    assert.equal(req.url, protocol === 'vercel' ? '/v1/evaluation-model' : '/v1/systemone');
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({answers:Object.fromEntries(Object.keys(body.questions).map(id=>[id,{type:'noul',noul:0.9}]))}));
+    res.end(JSON.stringify({answers:Object.fromEntries(Object.keys(body.questions).map(id=>[id,protocol === 'vercel' ? {type:'boolean',probability:0.9} : {type:'noul',noul:0.9}]))}));
   });
   server.listen(0,'127.0.0.1'); await once(server,'listening');
   t.after(()=>{server.closeAllConnections();server.close();});
@@ -34,7 +35,7 @@ test('only Just enough tools mode starts empty and routes through the configured
   await h.ctx.plugin(Loader);
   await h.ctx.plugin(Skills);
   await h.ctx.plugin(AgentPresets,{default:'standard'});
-  await h.ctx.plugin(Settings,{apiKey:'mode-test-key',baseUrl:`http://127.0.0.1:${address.port}/v1`});
+  await h.ctx.plugin(Settings,{protocol,apiKey:'mode-test-key',baseUrl:`http://127.0.0.1:${address.port}/v1`});
   await h.ctx.agentPresets.register({id:'standard',plugins:[{name:tools}]});
   await h.ctx.agentPresets.register({id:'just-enough-tools',name:'Just enough tools',plugins:[{name:tools},{name:routing}]});
   const create = async (id:string,preset:string) => (await h.ctx.agents.create({

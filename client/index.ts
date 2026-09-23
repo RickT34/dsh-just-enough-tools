@@ -9,25 +9,27 @@ import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots
 
 const en = {
   title: 'Just enough tools', description: 'Configure Jev to select tools and skills in Just enough tools mode.',
-  apiKey: 'Jev API key', keySet: 'A key is saved.', keyUnset: 'No key is saved. TYPESAFE_API_KEY can also supply it.',
+  protocol: 'Provider API protocol', providerHint: 'Choose the provider protocol. Leave URL and model blank to use its defaults; custom compatible endpoints are supported. Use the API key from that provider.',
+  apiKey: 'Provider API key', keySet: 'A key is saved.', keyUnset: 'No key is saved. Set JEV_API_KEY, or AI_GATEWAY_API_KEY for Vercel / TYPESAFE_API_KEY for System One.',
   keyHint: 'Leave blank to keep the saved key. Saved keys are not returned to this page.',
   baseUrl: 'Jev API base URL', model: 'Jev model', threshold: 'Tool / skill threshold', maxSteps: 'Steps per user turn', timeout: 'Scoring timeout (ms)',
   save: 'Save', saved: 'Saved.', saving: 'Saving…', discard: 'Discard changes', clear: 'Reset saved key',
   failed: 'Could not save. Reload this page and try again.', loading: 'Loading settings…', readonly: 'Settings are read-only for this connection.',
-  hint: 'Choose Just enough tools when starting a new conversation. API key, URL and model apply on the next scoring call; routing limits apply to new conversations.',
+  hint: 'Choose Just enough tools when starting a new conversation. Protocol, API key, URL and model apply on the next scoring call; routing limits apply to new conversations.',
 };
 const zh: Record<keyof typeof en, string> = {
   title: 'Just enough tools', description: '配置 Jev，在 Just enough tools 模式中统一选择 tools 与 skills。',
-  apiKey: 'Jev API Key', keySet: '已保存密钥。', keyUnset: '尚未保存密钥，也可以通过 TYPESAFE_API_KEY 提供。',
+  protocol: '提供商接口协议', providerHint: '选择提供商协议。地址和模型留空使用对应默认值，也可填写兼容接口的自定义地址。请使用该提供商的 API Key。',
+  apiKey: '提供商 API Key', keySet: '已保存密钥。', keyUnset: '尚未保存密钥。可设置 JEV_API_KEY，或使用 Vercel 的 AI_GATEWAY_API_KEY / System One 的 TYPESAFE_API_KEY。',
   keyHint: '留空保留已保存密钥；页面不会读取或显示已有密钥。',
   baseUrl: 'Jev API 地址', model: 'Jev 模型', threshold: 'Tool / Skill 开放阈值', maxSteps: '每轮对话的最大步骤', timeout: '评分超时（毫秒）',
   save: '保存', saved: '已保存。', saving: '保存中…', discard: '放弃修改', clear: '重置已保存密钥',
   failed: '保存失败，请重新打开页面后重试。', loading: '正在加载设置…', readonly: '当前连接只能读取设置。',
-  hint: '新建对话时选择 Just enough tools 模式。API Key、地址和模型在下次评分生效；路由限制在新对话生效。',
+  hint: '新建对话时选择 Just enough tools 模式。协议、API Key、地址和模型在下次评分生效；路由限制在新对话生效。',
 };
 type TextKey = keyof typeof en;
 declare module '@deepseek-ai/dsh-client-ui-slots' { interface LocaleNamespaceMap { 'just-enough-tools.ui': TextKey } }
-interface Values { baseUrl?: string; model?: string; threshold?: number; maxSteps?: number; scoreTimeoutMs?: number }
+interface Values { protocol?: 'systemone' | 'vercel'; baseUrl?: string; model?: string; threshold?: number; maxSteps?: number; scoreTimeoutMs?: number }
 type CardProps = PropsRuntime<'plugins.bundle.config'> & PropsLocale<'just-enough-tools.ui'> & {
   scope: ConfigForm<Values>; mirror: SettingsDescribeFace;
 };
@@ -41,6 +43,7 @@ export function JustEnoughToolsCard({ scope, mirror, t, view }: CardProps) {
   const revision = useRef<number | undefined>(undefined);
   const dirty = Object.keys(draft).length > 0;
   const values = snapshot.value ?? {};
+  const gateway = (draft.protocol ?? values.protocol) === 'vercel';
   const disabled = !snapshot.writable || status === 'saving';
   const configured = overview.view?.namespaces.find(n => n.ns === 'just-enough-tools')?.secrets.some(s => s.path.join('.') === 'apiKey' && s.set);
   const edit = (name: string, value: string) => {
@@ -79,12 +82,19 @@ export function JustEnoughToolsCard({ scope, mirror, t, view }: CardProps) {
     disabled, step: key === 'threshold' ? '0.05' : '1',
     min: key === 'threshold' ? 0 : key === 'maxSteps' ? 2 : type === 'number' ? 1 : undefined,
     max: key === 'threshold' ? 1 : undefined,
-    required: key !== 'apiKey',
+    placeholder: key === 'baseUrl' ? (gateway ? 'https://ai-gateway.vercel.sh/v4/ai' : 'https://api.typesafe.ai/v1')
+      : key === 'model' ? (gateway ? 'typesafe-ai/jev' : 'jev-latest') : undefined,
+    required: !['apiKey', 'baseUrl', 'model'].includes(key),
     onChange: (event: React.ChangeEvent<HTMLInputElement>) => edit(key, event.target.value),
     style: { padding: '8px 10px', border: '1px solid #8886', borderRadius: 6, background: 'transparent', color: 'inherit' },
   }));
   return h('form', { onSubmit: save, style: { display: 'grid', gap: 16, maxWidth: 640, padding: '12px 0' } },
     h('p', null, t('hint')),
+    h('label', { style: { display: 'grid', gap: 6 } }, t('protocol'),
+      h('select', { value: draft.protocol ?? values.protocol ?? 'systemone', disabled,
+        onChange: (event: React.ChangeEvent<HTMLSelectElement>) => edit('protocol', event.target.value),
+      }, h('option', { value: 'systemone' }, 'System One / TypeSafe'), h('option', { value: 'vercel' }, 'Vercel AI Gateway (Evaluation)'))),
+    h('small', null, t('providerHint')),
     field('apiKey', 'apiKey', 'password'),
     h('small', { role: 'status' }, t(configured ? 'keySet' : 'keyUnset'), ' ', t('keyHint')),
     h('button', { type: 'button', style: buttonStyle, disabled, onClick: () => { revision.current = snapshot.revision; setDraft(old => ({ ...old, apiKey: '' })); setStatus('idle'); } }, t('clear')),

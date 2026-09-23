@@ -60,13 +60,13 @@ npm pack
 Install it into your dsh Web profile:
 
 ```sh
-dsh plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.4.0.tgz
+npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/just-enough-tools/dsh-just-enough-tools-0.4.1.tgz
 ```
 
-Restart your dsh Web process (`dsh web`), then:
+Restart your dsh Web process (`npx @deepseek-ai/dsh@0.1.7-alpha.1 web`), then:
 
 1. Open **Plugins → dsh-just-enough-tools**.
-2. Set your **Jev API key**, API base URL and model; click **Save**.
+2. Choose the **Provider API protocol**, enter its **Provider API key**, optionally override the URL and model, and click **Save**.
 3. Start a new conversation and choose **Just enough tools** in the mode picker before sending the first message.
 
 Just enough tools appears alongside the existing Standard, PTC, Minimal and Creator modes. It does not change the default mode or route ordinary-mode agents. If the mode picker is hidden, enable mode selection in dsh's General settings.
@@ -87,18 +87,41 @@ Reproduce the failure, inspect the relevant code, make a focused fix, and run th
 
 Jev initially receives the skill's summary, not its full body. Selected instructions are injected automatically, preserving resource paths; there is no extra `skill` tool to unlock. Only model-invocable skills participate. Tools needed by a skill still pass their own threshold.
 
+### Missing preset component at startup
+
+If startup reports `Cannot find package '@deepseek-ai/dsh-agent-preset'`, check `dsh --version`. This plugin requires **0.1.7-alpha.1**; the 0.1.5 CLI does not include this component. Use the pinned version for both installation and startup. Updating the plugin does not upgrade dsh:
+
+```sh
+npx @deepseek-ai/dsh@0.1.7-alpha.1 web
+```
+
+### Vercel AI Gateway and custom providers
+
+In **Plugins → dsh-just-enough-tools**, select **Vercel AI Gateway (Evaluation)** and enter your Gateway API key. Leave the URL and model blank to use these defaults:
+
+| Setting | Vercel AI Gateway | System One / TypeSafe |
+| --- | --- | --- |
+| API base URL | `https://ai-gateway.vercel.sh/v4/ai` | `https://api.typesafe.ai/v1` |
+| Jev model | `typesafe-ai/jev` | `jev-latest` |
+| Key environment variable | `AI_GATEWAY_API_KEY` | `TYPESAFE_API_KEY` |
+
+You can also set `JEV_API_KEY` for either protocol. A saved key takes priority, followed by `JEV_API_KEY`, then the matching provider variable. When switching providers, replace the saved key or reset it to use the environment variable; clear any old URL/model overrides to use the new defaults.
+
+For another provider or a self-hosted proxy, choose its compatible protocol and enter its base URL, API key and Jev model ID. Full endpoints are also accepted. System One uses `/systemone` with Noul answers; Vercel uses `/evaluation-model` with boolean probabilities, matching the [AI SDK evaluation interface](https://vercel.com/docs/ai-gateway/sdks-and-apis/ai-sdk). An OpenAI-compatible chat endpoint alone does not supply this evaluation protocol.
+
 ### Settings
 
 | Field | Default | Purpose |
 | --- | --- | --- |
-| Jev API key | empty | TypeSafe credential; `TYPESAFE_API_KEY` is also a fallback |
-| API base URL | `https://api.typesafe.ai/v1` | TypeSafe System One endpoint base |
-| Jev model | `jev-latest` | Select the Jev model version |
+| Provider API protocol | `systemone` | System One or Vercel Evaluation; compatible custom endpoints supported |
+| Provider API key | empty | Saved key, then `JEV_API_KEY`, then the matching provider environment variable |
+| API base URL | blank: protocol default | Compatible provider base URL or full endpoint |
+| Jev model | blank: protocol default | Provider-specific Jev model ID |
 | Tool / skill threshold | `0.5` | The same strict probability threshold for both kinds |
 | Steps per user turn | `12` | Maximum model decisions, including planning |
 | Routing timeout | `60000` ms | Bound each discovery, scoring or skill-loading operation |
 
-Settings are persisted through dsh. Saved keys are redacted from settings reads and never filled back into the page; leave the field blank to keep the saved key, or use **Reset saved key** to remove the profile override. API key, URL and model changes apply to the next scoring call. Start a new conversation to use new routing limits.
+Settings are persisted through dsh. Saved keys are redacted from settings reads and never filled back into the page; leave the field blank to keep the saved key, or use **Reset saved key** to remove the profile override. Protocol, API key, URL and model changes apply to the next scoring call. Start a new conversation to use new routing limits.
 
 To remove the mode:
 

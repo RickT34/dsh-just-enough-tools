@@ -32,8 +32,10 @@ Enabled capabilities persist across user turns. Selected skill content is retain
 
 ## Configuration
 
-Use the plugin page for the API key, base URL, model, shared tool/skill threshold, step limit and operation timeout. The timeout bounds each discovery, scoring or skill-load operation. Configuration is persisted by dsh; secret fields are redacted from settings reads. An empty saved key falls back to `TYPESAFE_API_KEY`.
+Use the plugin page for the provider protocol, API key, base URL, model, shared tool/skill threshold, step limit and operation timeout. The timeout bounds each discovery, scoring or skill-load operation. Configuration is persisted by dsh; secret fields are redacted from settings reads. An empty saved key falls back to `JEV_API_KEY`, then `AI_GATEWAY_API_KEY` for Vercel or `TYPESAFE_API_KEY` for System One. Blank URL/model values use protocol defaults. Both protocols support compatible custom base URLs or full endpoints. The Vercel adapter uses the AI SDK v4 evaluation wire format (`boolean` / `probability`); System One uses `noul` / `noul`. No chat-model scoring fallback is used.
 
 API key, URL and model changes apply to the next scoring call. Start a new conversation for new routing limits. The default base URL is `https://api.typesafe.ai/v1`, and the model is `jev-latest`. There is no LLM scoring fallback.
+
+Gateway protocol reference: [official evaluation adapter](https://github.com/vercel/ai/blob/main/packages/gateway/src/gateway-evaluation-model.ts).
 
 API reference: [TypeSafe System One](https://docs.typesafe.ai/api), [Noul](https://docs.typesafe.ai/primitives/noul).

@@ -1,4 +1,4 @@
-/** Jev Noul adapter: independent tool-necessity decisions through TypeSafe's API. */
+/** Jev decisions through native System One or compatible evaluation gateways. */
 export type CapabilityKind = 'tool' | 'skill';
 
 /** A tool operation or reusable skill, identified independently even when names coincide. */
@@ -32,9 +32,16 @@ export interface Scorer {
   score(input: ScoringInput, signal: AbortSignal): Promise<ScoringResult>;
 }
 
+export type JevProtocol = 'systemone' | 'vercel';
+export const JEV_DEFAULTS = {
+  systemone: { baseUrl: 'https://api.typesafe.ai/v1', model: 'jev-latest' },
+  vercel: { baseUrl: 'https://ai-gateway.vercel.sh/v4/ai', model: 'typesafe-ai/jev' },
+} as const;
+
 export interface JevConfig {
+  protocol?: JevProtocol;
   apiKey: string;
-  /** TypeSafe API base URL. */
+  /** Provider base URL or full evaluation endpoint; defaults depend on protocol. */
   baseUrl?: string;
   model?: string;
   timeoutMs?: number;
@@ -47,14 +54,19 @@ export class ScorerError extends Error {
   constructor(readonly code: string) { super(code); }
 }
 
-/** Load TypeSafe credentials independently of the execution model's configuration. */
+/** Keep scorer credentials separate from the acting model and other providers. */
+export function jevApiKeyFromEnv(protocol: JevProtocol, env = process.env): string | undefined {
+  return env.JEV_API_KEY || (protocol === 'vercel' ? env.AI_GATEWAY_API_KEY : env.TYPESAFE_API_KEY);
+}
 export function jevConfigFromEnv(env = process.env): JevConfig {
-  const apiKey = env.TYPESAFE_API_KEY;
-  if (!apiKey?.trim()) throw new Error('Set TYPESAFE_API_KEY to use the Jev scorer.');
+  const protocol = env.JEV_PROTOCOL || 'systemone';
+  if (protocol !== 'systemone' && protocol !== 'vercel') throw new Error('Unsupported Jev protocol.');
+  const apiKey = jevApiKeyFromEnv(protocol, env);
+  if (!apiKey?.trim()) throw new Error('Set JEV_API_KEY, or the matching AI_GATEWAY_API_KEY / TYPESAFE_API_KEY.');
   return {
-    apiKey,
-    baseUrl: env.TYPESAFE_BASE_URL || 'https://api.typesafe.ai/v1',
-    model: env.JEV_MODEL || 'jev-latest',
+    apiKey, ...(protocol === 'vercel' ? { protocol } : {}),
+    baseUrl: env.JEV_BASE_URL || (protocol === 'systemone' ? env.TYPESAFE_BASE_URL : undefined) || JEV_DEFAULTS[protocol].baseUrl,
+    model: env.JEV_MODEL || JEV_DEFAULTS[protocol].model,
   };
 }
 
@@ -79,24 +91,28 @@ function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-/** One request scores tools and skills together, with one Noul per remaining capability. */
+/** One request scores tools and skills together, with one probability question per remaining capability. */
 export class JevScorer implements Scorer {
+  private readonly protocol: JevProtocol;
   private readonly endpoint: URL;
   private readonly timeoutMs: number;
   private readonly model: string;
 
   constructor(private readonly config: JevConfig) {
-    if (!config.apiKey?.trim()) throw new Error('Jev requires a TypeSafe API key.');
-    this.endpoint = new URL(config.baseUrl ?? 'https://api.typesafe.ai/v1');
+    if (!config.apiKey?.trim()) throw new Error('Jev requires a provider API key.');
+    this.protocol = config.protocol ?? 'systemone';
+    if (!Object.hasOwn(JEV_DEFAULTS, this.protocol)) throw new Error('Unsupported Jev protocol.');
+    this.endpoint = new URL(config.baseUrl?.trim() || JEV_DEFAULTS[this.protocol].baseUrl);
     if (!['https:', 'http:'].includes(this.endpoint.protocol) || this.endpoint.username
       || this.endpoint.password || this.endpoint.search || this.endpoint.hash) {
       throw new Error('Jev baseUrl must be an HTTP(S) URL without credentials, query or fragment.');
     }
     const path = this.endpoint.pathname.replace(/\/$/, '');
-    this.endpoint.pathname = path.endsWith('/systemone') ? path : `${path}/systemone`;
+    const suffix = this.protocol === 'vercel' ? '/evaluation-model' : '/systemone';
+    this.endpoint.pathname = path.endsWith(suffix) ? path : `${path}${suffix}`;
     this.timeoutMs = config.timeoutMs ?? 60_000;
     if (!Number.isInteger(this.timeoutMs) || this.timeoutMs <= 0) throw new Error('timeoutMs must be a positive integer.');
-    this.model = config.model ?? 'jev-latest';
+    this.model = config.model?.trim() || JEV_DEFAULTS[this.protocol].model;
     if (!this.model.trim()) throw new Error('Jev model must not be empty.');
   }
 
@@ -111,7 +127,7 @@ export class JevScorer implements Scorer {
       throw new ScorerError('INVALID_CANDIDATES');
     }
     const questions = Object.fromEntries(input.candidates.map((id, index) => [`capability_${index}`, {
-      type: 'noul',
+      type: this.protocol === 'vercel' ? 'boolean' : 'noul',
       instructions: {
         capability_id: id,
         capability_kind: known.get(id)!.kind,
@@ -129,8 +145,15 @@ export class JevScorer implements Scorer {
     try {
       response = await (this.config.fetch ?? globalThis.fetch)(this.endpoint, {
         method: 'POST', signal: combined,
-        headers: { Authorization: `Bearer ${this.config.apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: this.model, state: {
+        headers: { Authorization: `Bearer ${this.config.apiKey}`, 'Content-Type': 'application/json',
+          ...(this.protocol === 'vercel' ? {
+            'ai-gateway-protocol-version': '0.0.1',
+            'ai-gateway-auth-method': 'api-key',
+            'ai-evaluation-model-specification-version': '4',
+            'ai-model-id': this.model,
+          } : {}),
+        },
+        body: JSON.stringify({ ...(this.protocol === 'systemone' ? { model: this.model } : {}), state: {
           task: input.task, progress: input.progress, all_capabilities: input.allCapabilities,
           enabled_capabilities: input.enabled, active_skills: input.activeSkills,
         }, questions }),
@@ -156,12 +179,20 @@ export class JevScorer implements Scorer {
     }
     const entries = input.candidates.map((name, index) => {
       const answer = answers[`capability_${index}`];
-      if (!record(answer) || answer.type !== 'noul') throw new ScorerError('EXPECTED_NOUL');
-      return [name, answer.noul];
+      const gateway = this.protocol === 'vercel';
+      if (!record(answer) || answer.type !== (gateway ? 'boolean' : 'noul')) {
+        throw new ScorerError(gateway ? 'EXPECTED_BOOLEAN' : 'EXPECTED_NOUL');
+      }
+      return [name, gateway ? answer.probability : answer.noul];
     });
     const scores = validateScores(Object.fromEntries(entries), input.candidates);
     const usage = record(data.usage) ? Object.fromEntries(Object.entries(data.usage)
       .filter(([, value]) => typeof value === 'number' && Number.isFinite(value) && value >= 0)) as Record<string, number> : undefined;
+    if (usage && this.protocol === 'vercel') {
+      if (usage.inputTokens !== undefined) usage.input_tokens = usage.inputTokens;
+      if (usage.outputTokens !== undefined) usage.output_tokens = usage.outputTokens;
+      delete usage.inputTokens; delete usage.outputTokens;
+    }
     if (usage && usage.input_tokens !== undefined && usage.output_tokens !== undefined) {
       usage.total_tokens = usage.input_tokens + usage.output_tokens;
     }
