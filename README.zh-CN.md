@@ -23,9 +23,9 @@ Agent 往往会收到远超当前任务所需的能力，由此产生两类浪�
 
 图中蓝色表示 tool，紫色表示 skill。Jev 接收用户任务、Agent 最新一轮的最终文字、剩余候选能力摘要、已开放能力集合，以及已启用 skill 的完整指令，不接收工具执行参数 schema。
 
-只有 Agent 在一轮最终回复的独立首行输出 `[REQUEST_CAPABILITIES]`，并在后面说明缺少的操作能力或工作流程时，才调用评分器。`agent_response` 只包含该轮最终回复的纯文本，不包含工具调用、工具结果或隐藏思考。工具和 skill 共用阈值，**高于阈值**的能力被开放并持续保留。后续请求只评分剩余候选；skill 的工具依赖仍独立评分。
+Agent 一轮最终回复的任意位置包含 `REQUEST_CAPABILITIES` 或支持的拼写变体时，就调用评分器。提示词要求 Agent 说明缺少的操作能力或工作流程。`agent_response` 只包含该轮最终回复的纯文本，不包含工具调用、工具结果或隐藏思考。工具和 skill 共用阈值，**高于阈值**的能力被开放并持续保留。后续请求只评分剩余候选；skill 的工具依赖仍独立评分。
 
-检测兼容大小写、全角括号、空格或连字符、Markdown 标题/列表/加粗、同行描述，以及标记前的说明；代码块和引用块中的示例不触发评分。推荐始终使用上面的标准格式。
+检测忽略大小写，兼容全角字符、空格、连字符和省略分隔符。不限制括号、位置或 Markdown 格式；单独关键词、引用和代码块中的关键词也会触发。
 
 没有标记时直接结束，包括首轮：**不调用 Jev，也不增加 Agent 调用**。明确请求后，Agent 根据路由结果继续；如果没有能力通过阈值，则利用现有能力回答或说明限制，不重复申请相同能力。
 
@@ -55,7 +55,7 @@ npm pack
 安装插件并启动 dsh：
 
 ```sh
-npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/dsh-just-enough-tools-0.5.7.tgz
+npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/dsh-just-enough-tools-0.5.8.tgz
 npx @deepseek-ai/dsh@0.1.7-alpha.1 web
 ```
 

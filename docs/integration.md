@@ -6,7 +6,7 @@ The bundle targets DeepSeek Harness `0.1.7-alpha.1` and Cordis `4.0.3`. It adds 
 
 Tools and skills share one candidate pool and threshold. IDs are namespaced as `tool:<name>` and `skill:<name>`. The scorer receives the task, the completed round’s final Agent text (`agent_response`), candidate descriptions and already selected skill instructions; hidden model reasoning is excluded.
 
-The first Agent response has no tools or skills. In every round, scoring requires `[REQUEST_CAPABILITIES]` alone on the first line of the final reply, followed by nonempty capability needs. Inline mentions, code-fenced examples and tool-call replies do not trigger scoring. Detection tolerates case, full-width brackets, spaces or hyphens, Markdown headings/lists/emphasis, inline descriptions and preceding text. Fenced code and blockquotes are ignored. The canonical format above is recommended.
+The first Agent response has no tools or skills. In every round, scoring requires `REQUEST_CAPABILITIES` or a supported spelling variant anywhere in the final reply. Matching ignores case, normalizes full-width characters and accepts spaces, underscores, hyphens or no separator, plus singular `CAPABILITY`. Bare markers, inline mentions, quotes and code blocks all match; replies containing tool calls still wait until the round ends.
 
 Without the marker, execution ends without scoring or continuation. A request admits only capabilities above the threshold and resumes the Agent; if none qualify, it must answer within current limits without repeating the same request.
 

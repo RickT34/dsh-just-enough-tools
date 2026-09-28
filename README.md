@@ -23,9 +23,9 @@ Example scores illustrate progressive selection; they are not benchmark results.
 
 The diagram uses blue for tools and purple for skills. Jev receives the task, the latest final Agent text, summaries of remaining candidates, the enabled capability set, and any active skill instructions. Execution parameter schemas are omitted.
 
-Scoring runs only when the Agent ends a round with `[REQUEST_CAPABILITIES]` alone on the first line, followed by a description of the missing operation or workflow. `agent_response` contains only that round's final text; tool calls, tool results and hidden reasoning are excluded. Tools and skills **above** the shared threshold are enabled and remain available. Later requests score only remaining candidates; skill dependencies are scored separately.
+Scoring runs when the final Agent text contains `REQUEST_CAPABILITIES` or a supported spelling variant anywhere. The Agent is prompted to describe the missing operation or workflow. `agent_response` contains only that round's final text; tool calls, tool results and hidden reasoning are excluded. Tools and skills **above** the shared threshold are enabled and remain available. Later requests score only remaining candidates; skill dependencies are scored separately.
 
-Detection tolerates case, full-width brackets, spaces or hyphens, Markdown headings/lists/emphasis, inline descriptions and preceding text. Fenced code and blockquotes are ignored. The canonical format above is recommended.
+Detection ignores case and tolerates full-width characters, spaces, hyphens and omitted separators. Brackets, position and Markdown formatting do not matter: bare keywords, quoted text and code blocks also match.
 
 Without the marker, the answer ends the turn immediately, including the first response: **no Jev call and no extra Agent call**. After an explicit request, the Agent continues with the routing result. If no capability is admitted, it answers with current capabilities or explains the limitation, without repeating the same request.
 
@@ -55,7 +55,7 @@ npm pack
 Install the package and start dsh:
 
 ```sh
-npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/dsh-just-enough-tools-0.5.7.tgz
+npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/dsh-just-enough-tools-0.5.8.tgz
 npx @deepseek-ai/dsh@0.1.7-alpha.1 web
 ```
 

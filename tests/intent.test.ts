@@ -21,9 +21,9 @@ test('recognizes explicit requests with common model formatting variations', () 
   for (const text of requests) assert.equal(requestsCapabilities(text), true, text);
 });
 
-test('does not route ordinary prose, quoted examples, empty or unrelated markers', () => {
+test('matches keywords anywhere, including bare markers, quotes and code', () => {
   const answers = [
-    '4.', 'I may need a tool.', 'The marker is [REQUEST_CAPABILITIES].',
+    'The marker is [REQUEST_CAPABILITIES].',
     '[REQUEST_CAPABILITIES]', '[REQUEST_CAPABILITIES]\n  ',
     '[REQUEST_CAPABILITIES_EXTRA]\nRead the file.',
     '> [REQUEST_CAPABILITIES]\n> Read the file.',
@@ -32,5 +32,11 @@ test('does not route ordinary prose, quoted examples, empty or unrelated markers
     '<!-- [REQUEST_CAPABILITIES]\nRead the file. -->',
     '```\n[REQUEST_CAPABILITIES]\nRead the file.',
   ];
-  for (const text of answers) assert.equal(requestsCapabilities(text), false, text);
+  for (const text of answers) assert.equal(requestsCapabilities(text), true, text);
+});
+
+test('does not route text without a capability-request keyword', () => {
+  for (const text of ['', '4.', 'I may need a tool.', 'Capabilities are available.', 'REQUEST_TOOLS']) {
+    assert.equal(requestsCapabilities(text), false, text);
+  }
 });

@@ -5,11 +5,6 @@ import { candidate, harness, ScriptedAdapter, textResponse, run, prompt } from '
 for (const answer of [
   '2 + 2 = 4.',
   'No external capabilities needed.\n4.',
-  'The documentation mentions [REQUEST_CAPABILITIES].',
-  '> [REQUEST_CAPABILITIES]\nQuoted request.',
-  '```\n[REQUEST_CAPABILITIES]\nQuoted example.\n```',
-  '[REQUEST_CAPABILITIES]',
-  '[REQUEST_CAPABILITIES]\n   ',
 ]) test('no valid intent skips scoring: ' + JSON.stringify(answer), async t => {
   let calls = 0;
   const adapter = new ScriptedAdapter([textResponse(answer)]);
@@ -83,3 +78,19 @@ test('repeated requests cannot exceed the step budget', async t => {
   assert.equal(adapter.requests.length, 2);
   assert.equal(calls, 1);
 });
+
+for (const reply of ['Please REQUEST_CAPABILITIES to read files.', '[REQUEST_CAPABILITIES]', '> request-capabilities', '```\nREQUEST CAPABILITIES\n```']) {
+  test('keyword anywhere triggers one scoring call: ' + JSON.stringify(reply), async t => {
+    let calls = 0;
+    const adapter = new ScriptedAdapter([textResponse(reply), textResponse('Done.')]);
+    const h = await harness(adapter, { catalog: [candidate('read')], scorer: {
+      score: async () => { calls++; return { scores: { 'tool:read': 0.9 } }; },
+    } });
+    t.after(() => h.ctx.fiber.dispose());
+    const agent = await h.create(); await run(agent);
+    assert.deepEqual(h.errors, []);
+    assert.equal(calls, 1);
+    assert.equal(adapter.requests.length, 2);
+    assert.deepEqual(adapter.requests[1]!.tools?.map(tool => tool.name), ['read']);
+  });
+}
