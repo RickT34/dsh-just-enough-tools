@@ -22,7 +22,7 @@ function text(request: GenerateOptions): string {
 test('same-named tools and skills are independently scored and a skill at the threshold stays hidden', async t => {
   const inputs: ScoringInput[] = [];
   let loaded = 0;
-  const adapter = new ScriptedAdapter([textResponse('plan'), callResponse('read'), textResponse('Need the workflow'), textResponse('done')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), callResponse('read'), textResponse('[REQUEST_CAPABILITIES]\nNeed the workflow'), textResponse('done')]);
   const h = await harness(adapter, {
     catalog: [candidate('read'), skill('read', '', async () => { loaded++; return 'SKILL_BODY {{literal}}'; })],
     scorer: { score: async (input): Promise<ScoringResult> => {
@@ -48,7 +48,7 @@ test('same-named tools and skills are independently scored and a skill at the th
 });
 
 test('a skill can be admitted without enabling any tool or generic skill loader', async t => {
-  const adapter = new ScriptedAdapter([textResponse('plan'), textResponse('rewritten')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), textResponse('rewritten')]);
   const h = await harness(adapter, { catalog: [skill('writing')], scorer: { score: async () => ({ scores: { 'skill:writing': 1 } }) } });
   t.after(() => h.ctx.fiber.dispose());
   const agent = await h.create();
@@ -64,7 +64,7 @@ test('skill load failure prevents the entire mixed batch from registering', asyn
   const tool = candidate('read');
   const create = tool.create;
   tool.create = agent => { created++; return create(agent); };
-  const adapter = new ScriptedAdapter([textResponse('plan'), textResponse('fallback')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), textResponse('fallback')]);
   const h = await harness(adapter, {
     catalog: [tool, skill('workflow', '', async () => { throw new Error('unavailable'); })],
     scorer: { score: async () => ({ scores: { 'tool:read': 1, 'skill:workflow': 1 } }) },
@@ -80,7 +80,7 @@ test('skill load failure prevents the entire mixed batch from registering', asyn
 
 test('registration failure after a skill loads does not leak its instructions', async t => {
   const bad = candidate('bad'); bad.create = () => { throw new Error('broken registration'); };
-  const adapter = new ScriptedAdapter([textResponse('plan'), textResponse('fallback')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), textResponse('fallback')]);
   const h = await harness(adapter, {
     catalog: [skill('workflow', 'MUST_NOT_LEAK'), candidate('read'), bad],
     scorer: { score: async () => ({ scores: { 'skill:workflow': 1, 'tool:read': 1, 'tool:bad': 1 } }) },
@@ -94,7 +94,7 @@ test('registration failure after a skill loads does not leak its instructions', 
 
 test('a timed-out skill load cannot inject late instructions', async t => {
   const late = Promise.withResolvers<string>();
-  const adapter = new ScriptedAdapter([textResponse('plan'), textResponse('fallback')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), textResponse('fallback')]);
   const h = await harness(adapter, {
     catalog: [skill('slow', '', () => late.promise)], scoreTimeoutMs: 10,
     scorer: { score: async () => ({ scores: { 'skill:slow': 1 } }) },
@@ -108,7 +108,7 @@ test('a timed-out skill load cannot inject late instructions', async t => {
 });
 
 test('skill state survives session replay without duplicating already-present instructions', async t => {
-  const adapter = new ScriptedAdapter([textResponse('plan'), textResponse('first answer'), textResponse('next answer')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), textResponse('first answer'), textResponse('next answer')]);
   const h = await harness(adapter, {
     catalog: [skill('writing')], scorer: { score: async () => ({ scores: { 'skill:writing': 1 } }) },
   });
@@ -125,7 +125,7 @@ test('skill state survives session replay without duplicating already-present in
 test('newly discovered skills join the next decision without reopening existing tools', async t => {
   let published = false;
   const inputs: ScoringInput[] = [];
-  const adapter = new ScriptedAdapter([textResponse('plan'), callResponse('read'), textResponse('Need the workflow'), textResponse('done')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), callResponse('read'), textResponse('[REQUEST_CAPABILITIES]\nNeed the workflow'), textResponse('done')]);
   const h = await harness(adapter, {
     catalog: [candidate('read', async () => { published = true; return 'New workflow available'; })],
     discoverSkills: async () => ({ skills: published ? [skill('late', 'LATE_WORKFLOW')] : [], complete: true }),
@@ -143,7 +143,7 @@ test('newly discovered skills join the next decision without reopening existing 
 
 test('instructions revealed by a skill can trigger a later independent tool admission', async t => {
   const inputs: ScoringInput[] = [];
-  const adapter = new ScriptedAdapter([textResponse('plan'), textResponse('The workflow requires record access.'), callResponse('read'), textResponse('done')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), textResponse('[REQUEST_CAPABILITIES]\nThe workflow requires record access.'), callResponse('read'), textResponse('done')]);
   const h = await harness(adapter, {
     catalog: [candidate('read'), skill('workflow', 'Read a record to complete this workflow.')],
     scorer: { score: async (input): Promise<ScoringResult> => {
@@ -160,7 +160,7 @@ test('instructions revealed by a skill can trigger a later independent tool admi
 });
 
 test('native skill injections cannot bypass first-round selection', async t => {
-  const adapter = new ScriptedAdapter([textResponse('plan'), textResponse('answer')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), textResponse('answer')]);
   const h = await harness(adapter, { catalog: [], scorer: { score: async () => ({ scores: {} }) } });
   t.after(() => h.ctx.fiber.dispose());
   h.ctx.on('agent/pre-step', async (_payload, next) => {
@@ -201,7 +201,7 @@ test('filesystem discovery respects invocation policy and retains resource paths
 test('an incomplete discovery retains the last-known skill instead of dropping it', async t => {
   let discovery = 0;
   const inputs: ScoringInput[] = [];
-  const adapter = new ScriptedAdapter([textResponse('plan'), callResponse('read'), textResponse('Need the workflow'), textResponse('done')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), callResponse('read'), textResponse('[REQUEST_CAPABILITIES]\nNeed the workflow'), textResponse('done')]);
   const h = await harness(adapter, {
     catalog: [candidate('read')],
     discoverSkills: async () => ++discovery === 1 ? { skills: [skill('workflow')], complete: true } : { skills: [], complete: false },
@@ -220,7 +220,7 @@ test('an incomplete discovery retains the last-known skill instead of dropping i
 });
 
 test('skills opened in one agent do not appear in another agent', async t => {
-  const adapter = new ScriptedAdapter([textResponse('plan'), textResponse('first answer')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), textResponse('first answer')]);
   const h = await harness(adapter, { catalog: [skill('workflow')], scorer: { score: async () => ({ scores: { 'skill:workflow': 1 } }) } });
   t.after(() => h.ctx.fiber.dispose());
   const first = await h.create('first-skill');
@@ -236,7 +236,7 @@ test('skills opened in one agent do not appear in another agent', async t => {
 test('cancelling during skill loading leaves no instruction or tool admission', async t => {
   const entered = Promise.withResolvers<void>();
   const late = Promise.withResolvers<string>();
-  const adapter = new ScriptedAdapter([textResponse('plan')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan')]);
   const h = await harness(adapter, {
     catalog: [candidate('read'), skill('slow', '', () => { entered.resolve(); return late.promise; })],
     scorer: { score: async () => ({ scores: { 'tool:read': 1, 'skill:slow': 1 } }) },

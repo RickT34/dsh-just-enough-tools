@@ -90,9 +90,9 @@
 \node[anchor=base west,inner sep=0pt,text=color5,font={\sffamily\fontsize{12.0}{14.4}\selectfont\bfseries}] at (208,178) {01 / AGENT};
 \node[anchor=base west,inner sep=0pt,text=color1,font={\sffamily\fontsize{21.0}{25.2}\selectfont\bfseries}] at (208,215) {Think first};
 \node[anchor=base west,inner sep=0pt,text=color2,font={\sffamily\fontsize{15.0}{18.0}\selectfont}] at (208,248) {Start with no tools or skills.};
-\node[anchor=base west,inner sep=0pt,text=color2,font={\sffamily\fontsize{13.5}{16.2}\selectfont}] at (208,277) {Answer directly or explain which capabilities are needed.};
+\node[anchor=base west,inner sep=0pt,text=color2,font={\sffamily\fontsize{13.5}{16.2}\selectfont}] at (208,277) {Answer directly, or explicitly request missing capabilities.};
 \path[fill=color6,draw=none,rounded corners=6.0pt] (108,296) rectangle (742,332);
-\node[anchor=base west,inner sep=0pt,text=color1,font={\sffamily\fontsize{13.5}{16.2}\selectfont}] at (123,321) {"I need to inspect the login flow and find the cause."};
+\node[anchor=base west,inner sep=0pt,text=color1,font={\sffamily\fontsize{13.5}{16.2}\selectfont}] at (123,321) {Request: inspect the login flow and find the cause.};
 \path[fill=color7,draw=none,rounded corners=10.5pt] (810,458) rectangle (1130,740);
 \node[anchor=base west,inner sep=0pt,text=color2,font={\sffamily\fontsize{12.0}{14.4}\selectfont\bfseries}] at (834,493) {CAPABILITY POOL};
 \node[anchor=base west,inner sep=0pt,text=color2,font={\sffamily\fontsize{12.75}{15.3}\selectfont}] at (834,521) {Tools + skills, scored independently};
@@ -109,7 +109,7 @@
 \node[anchor=south west,inner sep=0pt] at (1019,677) {\jetemoji{27.0pt}{1f4bb}};
 \node[anchor=base,inner sep=0pt,text=color5,font={\sffamily\fontsize{12.0}{14.4}\selectfont}] at (1037.5,701) {bash};
 \draw[draw=color2,line width=1.875pt,line cap=round,line join=round,-{Stealth[length=6pt]}] (425,350) -- (425,398);
-\node[anchor=base west,inner sep=0pt,text=color2,font={\sffamily\fontsize{12.75}{15.3}\selectfont}] at (444,380) {Latest final text};
+\node[anchor=base west,inner sep=0pt,text=color2,font={\sffamily\fontsize{12.75}{15.3}\selectfont}] at (444,380) {Only with request marker};
 \path[fill=color3,draw=color10,rounded corners=10.5pt] (80,410) rectangle (770,740);
 \node[anchor=base west,inner sep=0pt,text=color9,font={\sffamily\fontsize{12.0}{14.4}\selectfont\bfseries}] at (108,448) {02 / JEV};
 \node[anchor=south west,inner sep=0pt] at (694,458) {\jetemoji{27.0pt}{1f9e0}};
@@ -170,7 +170,7 @@
 \node[anchor=base west,inner sep=0pt,text=color1,font={\sffamily\fontsize{19.5}{23.400000000000002}\selectfont\bfseries}] at (208,1102) {Act with selected capabilities};
 \node[anchor=base west,inner sep=0pt,text=color2,font={\sffamily\fontsize{13.5}{16.2}\selectfont}] at (208,1135) {Follow login-debug and read the relevant code.};
 \path[fill=color6,draw=none,rounded corners=6.0pt] (108,1164) rectangle (742,1203);
-\node[anchor=base west,inner sep=0pt,text=color1,font={\sffamily\fontsize{13.5}{16.2}\selectfont}] at (123,1190) {"I found the bug. I need to edit the code and run tests."};
+\node[anchor=base west,inner sep=0pt,text=color1,font={\sffamily\fontsize{13.5}{16.2}\selectfont}] at (123,1190) {New request: edit the code and run tests.};
 \path[fill=color16,draw=color10,rounded corners=10.5pt] (810,1026) rectangle (1130,1224);
 \node[anchor=base west,inner sep=0pt,text=color9,font={\sffamily\fontsize{12.0}{14.4}\selectfont\bfseries}] at (834,1062) {NEXT / JEV + PLUGIN};
 \node[anchor=base west,inner sep=0pt,text=color1,font={\sffamily\fontsize{12.75}{15.3}\selectfont}] at (834,1096) {Re-score only remaining candidates.};
@@ -182,16 +182,16 @@
 \node[anchor=base west,inner sep=0pt,text=color1,font={\sffamily\fontsize{13.5}{16.2}\selectfont}] at (834,1203) {and login-debug available.};
 \draw[draw=color2,line width=1.5pt,line cap=round,line join=round,-{Stealth[length=6pt]},dashed] (770,1121) -- (801,1121);
 \draw[draw=color2,line width=1.875pt,line cap=round,line join=round,-{Stealth[length=6pt]},dashed] (80,1185) -- (39,1185) -- (39,478) -- (74,478);
-\node[anchor=base west,inner sep=0pt,text=color2,font={\sffamily\fontsize{13.5}{16.2}\selectfont}] at (80,1257) {Repeat after the final reply, not during tool calls.};
+\node[anchor=base west,inner sep=0pt,text=color2,font={\sffamily\fontsize{13.5}{16.2}\selectfont}] at (80,1257) {Repeat only on a new capability request, never during tool calls.};
 \draw[draw=color2,line width=1.875pt,line cap=round,line join=round,-{Stealth[length=6pt]}] (425,1270) -- (425,1300);
 \path[fill=color13,draw=color14,rounded corners=10.5pt] (80,1312) rectangle (770,1422);
 \node[anchor=base west,inner sep=0pt,text=color15,font={\sffamily\fontsize{12.0}{14.4}\selectfont\bfseries}] at (108,1347) {FINISH / AGENT};
 \node[anchor=south west,inner sep=0pt] at (692,1360) {\jetemoji{25.5pt}{2705}};
 \node[anchor=base west,inner sep=0pt,text=color1,font={\sffamily\fontsize{17.25}{20.7}\selectfont\bfseries}] at (108,1379) {"Fixed the login error; tests passed."};
-\node[anchor=base west,inner sep=0pt,text=color2,font={\sffamily\fontsize{12.75}{15.3}\selectfont}] at (108,1407) {After re-scoring, no new admissions means the turn ends.};
+\node[anchor=base west,inner sep=0pt,text=color2,font={\sffamily\fontsize{12.75}{15.3}\selectfont}] at (108,1407) {No request marker: finish without calling Jev.};
 \path[fill=color3,draw=color8,rounded corners=10.5pt] (810,1312) rectangle (1130,1422);
 \node[anchor=base west,inner sep=0pt,text=color2,font={\sffamily\fontsize{12.0}{14.4}\selectfont\bfseries}] at (834,1347) {SIMPLE TASK SHORTCUT};
-\node[anchor=base west,inner sep=0pt,text=color1,font={\sffamily\fontsize{12.75}{15.3}\selectfont}] at (834,1377) {A verified complete first answer};
-\node[anchor=base west,inner sep=0pt,text=color1,font={\sffamily\fontsize{12.75}{15.3}\selectfont}] at (834,1403) {can skip the second Agent call.};
+\node[anchor=base west,inner sep=0pt,text=color1,font={\sffamily\fontsize{12.75}{15.3}\selectfont}] at (834,1377) {No marker on the first answer:};
+\node[anchor=base west,inner sep=0pt,text=color1,font={\sffamily\fontsize{12.75}{15.3}\selectfont}] at (834,1403) {skip Jev and the next Agent call.};
 \end{tikzpicture}
 \end{document}

@@ -6,11 +6,13 @@ The bundle targets DeepSeek Harness `0.1.7-alpha.1` and Cordis `4.0.3`. It adds 
 
 Tools and skills share one candidate pool and threshold. IDs are namespaced as `tool:<name>` and `skill:<name>`. The scorer receives the task, the completed round’s final Agent text (`agent_response`), candidate descriptions and already selected skill instructions; hidden model reasoning is excluded.
 
-The first Agent response has no tools or skills. It may provide a plan or a complete answer beginning with `No external capabilities needed.` A complete catalog and successful scores strictly below the threshold permit ending after that answer. Otherwise execution continues, admitting only capabilities above the threshold.
+The first Agent response has no tools or skills. In every round, scoring requires `[REQUEST_CAPABILITIES]` alone on the first line of the final reply, followed by nonempty capability needs. Inline mentions, code-fenced examples and tool-call replies do not trigger scoring. Detection tolerates case, full-width brackets, spaces or hyphens, Markdown headings/lists/emphasis, inline descriptions and preceding text. Fenced code and blockquotes are ignored. The canonical format above is recommended.
+
+Without the marker, execution ends without scoring or continuation. A request admits only capabilities above the threshold and resumes the Agent; if none qualify, it must answer within current limits without repeating the same request.
 
 Tool admission restores its executor, schema and scoped guidance. Skill admission loads its instructions through the dsh registry with provider and invocation-policy checks. Skills do not implicitly admit their required tools. Instructions retain user-role semantics and resource paths.
 
-Each agent owns its enabled set. Skill discovery refreshes between steps; incomplete discovery retains known candidates. Enabled capabilities persist across turns and are restored on replay. New tasks trigger renewed scoring.
+Each agent owns its enabled set. Skill discovery refreshes between steps; incomplete discovery retains known candidates. Enabled capabilities persist across turns and are restored on replay. New tasks can request additional capabilities through the same marker.
 
 ## Failure handling
 

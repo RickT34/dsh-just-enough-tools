@@ -23,9 +23,11 @@ Example scores illustrate progressive selection; they are not benchmark results.
 
 The diagram uses blue for tools and purple for skills. Jev receives the task, the latest final Agent text, summaries of remaining candidates, the enabled capability set, and any active skill instructions. Execution parameter schemas are omitted.
 
-Scoring runs after the Agent finishes its tool-use round. `agent_response` contains only that round’s final text as a string; tool calls, tool results and hidden reasoning are excluded. Each capability receives an independent score. Tools **above** the shared threshold become callable; selected skills load their full instructions. Enabled capabilities remain available, while later decisions consider the remaining candidates. A skill's required tools are scored separately. After the first planning round, new admissions trigger another Agent round; otherwise the Agent's answer ends the turn.
+Scoring runs only when the Agent ends a round with `[REQUEST_CAPABILITIES]` alone on the first line, followed by a description of the missing operation or workflow. `agent_response` contains only that round's final text; tool calls, tool results and hidden reasoning are excluded. Tools and skills **above** the shared threshold are enabled and remain available. Later requests score only remaining candidates; skill dependencies are scored separately.
 
-For simple tasks, the Agent can provide a complete first-response answer beginning with `No external capabilities needed.` If discovery is complete and all scores are **strictly below** the threshold, the plugin skips the second Agent call. Scoring still runs; failed scoring does not approve an early finish.
+Detection tolerates case, full-width brackets, spaces or hyphens, Markdown headings/lists/emphasis, inline descriptions and preceding text. Fenced code and blockquotes are ignored. The canonical format above is recommended.
+
+Without the marker, the answer ends the turn immediately, including the first response: **no Jev call and no extra Agent call**. After an explicit request, the Agent continues with the routing result. If no capability is admitted, it answers with current capabilities or explains the limitation, without repeating the same request.
 
 ### Example
 
@@ -33,9 +35,9 @@ For “Fix the login error and run the tests,” with a threshold of `0.50`:
 
 | Stage | Agent response or action | Jev / plugin decision |
 | --- | --- | --- |
-| Think | “I need to inspect the login flow.” | `read` 0.94 and `login-debug` 0.88 are enabled; `edit` 0.32 and `bash` 0.21 stay hidden. |
-| Inspect | Agent reads the code using the debug workflow, then replies: “Bug found. I need to edit and run tests.” | Only remaining candidates are scored: `edit` 0.97 and `bash` 0.93 are added. Previously enabled capabilities stay available. |
-| Finish | Agent edits the code, runs tests, and replies: “Fixed; tests passed.” | No new capability is admitted; the turn ends. |
+| Think | `[REQUEST_CAPABILITIES]` + newline + “I need to inspect the login flow.” | `read` 0.94 and `login-debug` 0.88 are enabled; `edit` 0.32 and `bash` 0.21 stay hidden. |
+| Inspect | Agent reads the code using the debug workflow, then requests: `[REQUEST_CAPABILITIES]` + newline + “Bug found. I need to edit and run tests.” | Only remaining candidates are scored: `edit` 0.97 and `bash` 0.93 are added. Previously enabled capabilities stay available. |
+| Finish | Agent edits the code, runs tests, and replies: “Fixed; tests passed.” | No marker: no Jev call; the turn ends. |
 
 Scores and outcomes are illustrative. A writing task may need only a style skill, or no external capabilities at all.
 
@@ -53,7 +55,7 @@ npm pack
 Install the package and start dsh:
 
 ```sh
-npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/dsh-just-enough-tools-0.5.6.tgz
+npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/dsh-just-enough-tools-0.5.7.tgz
 npx @deepseek-ai/dsh@0.1.7-alpha.1 web
 ```
 

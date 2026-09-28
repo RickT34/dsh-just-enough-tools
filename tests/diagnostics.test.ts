@@ -24,7 +24,7 @@ test('diagnostics show exact scores, strict threshold decisions and enabled capa
   assert.match(routingErrorHint('HTTP_401'), /API key/);
 });
 test('mode failure stops after planning, persists the error and never exposes provider body text', async t => {
-  const adapter = new ScriptedAdapter([textResponse('plan')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan')]);
   const h = await harness(adapter, { catalog: [candidate('read')], failOnRoutingError: true,
     scorer: { score: async () => { throw new ScorerError('HTTP_401'); } } });
   t.after(() => h.ctx.fiber.dispose());
@@ -38,7 +38,7 @@ test('mode failure stops after planning, persists the error and never exposes pr
   assert.deepEqual(h.ctx.tools.schemas(agent), []);
 });
 test('low scores are a successful decision and do not stop the agent', async t => {
-  const adapter = new ScriptedAdapter([textResponse('plan'), textResponse('answer')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), textResponse('answer')]);
   const h = await harness(adapter, { catalog: [candidate('read')], failOnRoutingError: true,
     scorer: { score: async () => ({ scores: { 'tool:read': 0.1 } }) } });
   t.after(() => h.ctx.fiber.dispose());
@@ -49,7 +49,7 @@ test('low scores are a successful decision and do not stop the agent', async t =
 });
 test('registration failure is visible and keeps the batch closed', async t => {
   const tool = candidate('read'); tool.create = () => { throw new Error('secret provider response'); };
-  const adapter = new ScriptedAdapter([textResponse('plan')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan')]);
   const h = await harness(adapter, { catalog: [tool], failOnRoutingError: true,
     scorer: { score: async () => ({ scores: { 'tool:read': 0.9 } }) } });
   t.after(() => h.ctx.fiber.dispose());
@@ -66,7 +66,7 @@ test('routing scores reach stderr without a host logger exporter', async () => {
   const { promisify } = await import('node:util');
   const script = `
     import { harness, candidate, ScriptedAdapter, textResponse, run } from './tests/helpers.ts';
-    const h = await harness(new ScriptedAdapter([textResponse('plan'),textResponse('answer')]), {
+    const h = await harness(new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\\nplan'),textResponse('answer')]), {
       catalog: [candidate('read')], debug: () => true,
       scorer: {score: async () => ({scores: {'tool:read': 0.75}})},
     });
@@ -87,7 +87,7 @@ test('disabled diagnostics do not print successful routing decisions', async () 
   const { promisify } = await import('node:util');
   const script = `
     import { harness, candidate, ScriptedAdapter, textResponse, run } from './tests/helpers.ts';
-    const h = await harness(new ScriptedAdapter([textResponse('plan'),textResponse('answer')]), {
+    const h = await harness(new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\\nplan'),textResponse('answer')]), {
       catalog: [candidate('read')], debug: () => false,
       scorer: {score: async () => ({scores: {'tool:read': 0.75}})},
     });

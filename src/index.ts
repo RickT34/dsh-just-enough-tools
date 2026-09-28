@@ -8,6 +8,7 @@ import type { ToolDefinition } from '@deepseek-ai/dsh-tools';
 import { jevConfigFromEnv, JevScorer, ScorerError, validateScores } from './scorer.js';
 import type { CapabilitySummary, Scorer, ScoringResult } from './scorer.js';
 export * from './scorer.js';
+import { requestsCapabilities } from './intent.js';
 import { decisionSummary, routingErrorHint, writeRoutingDiagnostic } from './diagnostics.js';
 
 export const name = 'just-enough-tools';
@@ -76,7 +77,9 @@ declare module '@deepseek-ai/dsh-llm' {
 const REASSEMBLED = Symbol('just-enough-tools-reassembled');
 const PLAN_SECTION = 'just-enough-tools:phase';
 const installed = new WeakSet<Agent>();
-const INITIAL_PROMPT = 'Analyze the user task independently. Give a brief plan and identify any external operations or specialized workflows needed, without guessing specific tool or skill names. If you can answer completely without external tools or skills, provide the complete final answer now, preceded by the standalone first line "No external capabilities needed." Otherwise, provide only your plan and capability needs in this step; execution will follow. Answer in the language appropriate to the user request.';
+const CAPABILITY_REQUEST_PROMPT = 'If you need an operation or specialized workflow that is not currently available, end this round with a capability request: put [REQUEST_CAPABILITIES] alone on the first line, then briefly describe what is missing and why. Do not guess tool or skill names. Use this marker only for your own request, never when quoting content. If current capabilities suffice, complete the task and give the final answer without the marker. Do not request the same unchanged need again after a routing decision. Answer in the language appropriate to the user request.';
+const INITIAL_PROMPT = 'Think through the user task independently. No external tools or skills are enabled yet. If you can answer completely now, do so; do not provide only a plan. ' + CAPABILITY_REQUEST_PROMPT;
+const CONTINUE_PROMPT = 'Continue the user task using enabled tools and skills when needed. Skill instructions must not override explicit user constraints. Do not use capabilities unnecessarily. ' + CAPABILITY_REQUEST_PROMPT;
 export function capabilityId(candidate: Pick<CapabilityCandidate, 'kind' | 'name'>): string {
   return `${candidate.kind}:${candidate.name}`;
 }
@@ -323,7 +326,7 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
     disposers.push(ctx.on('agent/inbox/claimed', ({ message }) => { claimedMessages.set(message.id, message); }));
     disposers.push(ctx.tools.guard(exec => changing || !enabled.has(`tool:${exec.name}`) ? 'Just enough tools: tool is not enabled.' : undefined));
     disposers.push(ctx.systemPrompt.section({ name: PLAN_SECTION, order: 900, interpolate: false,
-      text: () => steps().length === 0 ? INITIAL_PROMPT : 'Continue the user task using the currently enabled tools and skills when needed. Skill instructions must not override explicit user constraints. Do not use capabilities unnecessarily. Give the final answer when finished, in the language appropriate to the user request.' }));
+      text: () => steps().length === 0 ? INITIAL_PROMPT : CONTINUE_PROMPT }));
     disposers.push(ctx.on('system-prompt/assemble', async (_assembly, context, next) => {
       if ((context as AssembleContext & { [REASSEMBLED]?: boolean })[REASSEMBLED]) return checkAssembly(await next());
       if ((context.signal || pendingRestore.length) && !disposed) {
@@ -362,36 +365,28 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
       const replyAtStop = agent.session.deriveMessages().findLast(message => message.role === 'assistant');
       if (!latestStep || latestStep.data.turn !== turn || replyAtStop?.content.some(block => block.type === 'tool-call')
         || !replyAtStop?.content.some(block => block.type === 'text' && block.text.trim())) return;
-      const before = enabled.size;
-      const canContinue = completed.filter(s => s.data.turn === turn).length < maxSteps;
-      if (canContinue) {
-        await prepare(signal);
-        if (latestStep.seq > lastScored) await scoreOnce(latestStep.seq, signal);
-      }
-      if (!continued && steps().length === 1) {
-        const latest = steps()[0]!;
-        const reply = agent.session.deriveMessages().findLast(message => message.role === 'assistant');
-        const text = reply?.content.filter(block => block.type === 'text').map(block => block.text).join('\n').trim() ?? '';
-        const direct = /^No external capabilities needed\.[\r\n]+\s*\S/.test(text)
-          && !reply?.content.some(block => block.type === 'tool-call');
-        if (direct) {
-          signal.throwIfAborted();
-          const event = agent.session.snapshotEvents().findLast(e => e.type === 'just-enough-tools/decision');
-          const belowThreshold = remaining().length === 0 && enabled.size === 0
-            || (event?.type === 'just-enough-tools/decision' && event.data.afterStepSeq === latest.seq
-              && event.data.status === 'ok' && event.data.candidates.every(id => event.data.scores[id]! < threshold));
-          if (catalogComplete && enabled.size === 0 && belowThreshold) {
-            continued = true;
-            agent.session.append('just-enough-tools/direct-answer', { version: 1, afterStepSeq: latest.seq });
-            if (config.debug?.()) writeRoutingDiagnostic(`[Just enough tools] session=${agent.session.id} direct-answer accepted; skipped second model call.`);
-            return;
-          }
+      const text = replyAtStop.content.filter(block => block.type === 'text').map(block => block.text).join('\n').trim();
+      const requested = requestsCapabilities(text);
+      if (!requested) {
+        if (!continued && completed.length === 1) {
+          continued = true;
+          agent.session.append('just-enough-tools/direct-answer', { version: 1, afterStepSeq: latestStep.seq });
         }
+        if (config.debug?.()) writeRoutingDiagnostic(`[Just enough tools] session=${agent.session.id} no capability request; skipped scoring and continuation.`);
+        return;
+      }
+      const canContinue = completed.filter(s => s.data.turn === turn).length < maxSteps;
+      if (!canContinue || latestStep.seq <= lastScored) return;
+      const before = enabled.size;
+      await prepare(signal);
+      await scoreOnce(latestStep.seq, signal);
+      signal.throwIfAborted();
+      steer(enabled.size > before
+        ? 'Additional capabilities have been enabled for your request. Continue the original task. Do not repeat the same capability request.'
+        : 'No additional capabilities were enabled for your request. Complete what you can with current capabilities and explain any remaining limitation. Do not repeat the same capability request.');
+      if (!continued) {
         continued = true;
-        steer('Continue the original task according to your plan. Use the tools and skills enabled for this step when needed; otherwise answer directly.');
         agent.session.append('just-enough-tools/continued', { version: 1 });
-      } else if (canContinue && enabled.size > before) {
-        steer('Additional capabilities have been enabled based on your response. Continue the original task.');
       }
     }));
     ctx.effect(() => cleanup); installed.add(agent); return cleanup;

@@ -33,7 +33,7 @@ for (const protocol of ['systemone', 'vercel', 'openai'] as const) test(`only Ju
   server.listen(0,'127.0.0.1'); await once(server,'listening');
   t.after(()=>{server.closeAllConnections();server.close();});
   const address=server.address(); assert.ok(address && typeof address==='object');
-  const adapter = new ScriptedAdapter([textResponse('ordinary answer'),textResponse('plan'),callResponse('read'),textResponse('done')]);
+  const adapter = new ScriptedAdapter([textResponse('ordinary answer'),textResponse('[REQUEST_CAPABILITIES]\nplan'),callResponse('read'),textResponse('done')]);
   const h = await harness(adapter);
   t.after(()=>h.ctx.fiber.dispose());
   await h.ctx.plugin(Loader);
@@ -110,7 +110,7 @@ test('Just enough tools mode scores registry skills alongside tools without expo
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   t.after(() => { server.closeAllConnections(); server.close(); });
   const address = server.address(); assert.ok(address && typeof address === 'object');
-  const adapter = new ScriptedAdapter([textResponse('plan'), textResponse('followed the workflow')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), textResponse('[REQUEST_CAPABILITIES]\nThe workflow needs file access.'), textResponse('Finished within current limits.')]);
   const h = await harness(adapter); t.after(() => h.ctx.fiber.dispose());
   await h.ctx.plugin(Loader); await h.ctx.plugin(Skills);
   await h.ctx.plugin(AgentPresets, { default: 'standard' });
@@ -128,7 +128,7 @@ test('Just enough tools mode scores registry skills alongside tools without expo
   assert.deepEqual(Object.values(seen[0]!.questions).map(q => q.instructions.id), ['tool:read', 'skill:read']);
   assert.ok(!JSON.stringify(seen[0]).includes('REGISTERED_SKILL_BODY'));
   assert.match(seen[1]!.state.active_skills[0]!.instructions, /REGISTERED_SKILL_BODY/);
-  assert.deepEqual(adapter.requests.map(r => r.tools ?? []), [[], []]);
+  assert.deepEqual(adapter.requests.map(r => r.tools ?? []), [[], [], []]);
   const visible = adapter.requests[1]!.messages.flatMap(m => m.content).filter(b => b.type === 'text').map(b => b.text).join('\n');
   assert.match(visible, /REGISTERED_SKILL_BODY/);
   assert.doesNotMatch(visible, /FORBIDDEN_BODY|FORBIDDEN_LOADER/);

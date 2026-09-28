@@ -11,8 +11,8 @@ test('real agent loop starts empty, appends tools and guidance, and scores only 
   const inputs: ScoringInput[] = [];
   const executed: string[] = [];
   const adapter = new ScriptedAdapter([
-    textResponse('First I need lookup; its result may require decode.'),
-    callResponse('lookup'), textResponse('The lookup finished; decoding is required.'), callResponse('decode'), textResponse('Completed'),
+    textResponse('[REQUEST_CAPABILITIES]\nFirst I need lookup; its result may require decode.'),
+    callResponse('lookup'), textResponse('[REQUEST_CAPABILITIES]\nThe lookup finished; decoding is required.'), callResponse('decode'), textResponse('Completed'),
   ]);
   const h = await harness(adapter, {
     catalog: [candidate('lookup', async () => { executed.push('lookup'); return 'Now decode'; }),
@@ -34,17 +34,17 @@ test('real agent loop starts empty, appends tools and guidance, and scores only 
   assert.doesNotMatch(prompt(adapter.requests[1]!), /GUIDANCE_decode/);
   assert.match(prompt(adapter.requests[3]!), /GUIDANCE_decode/);
   assert.deepEqual(executed, ['lookup', 'decode']);
-  assert.deepEqual(inputs.map(i => i.candidates), [['tool:lookup', 'tool:decode', 'tool:unused'], ['tool:decode', 'tool:unused'], ['tool:unused']]);
+  assert.deepEqual(inputs.map(i => i.candidates), [['tool:lookup', 'tool:decode', 'tool:unused'], ['tool:decode', 'tool:unused']]);
   assert.equal(inputs[0]!.task, 'Complete the original task');
   assert.equal(inputs[1]!.allCapabilities.length, 3);
-  assert.equal(inputs[1]!.agentResponse, 'The lookup finished; decoding is required.');
+  assert.equal(inputs[1]!.agentResponse, '[REQUEST_CAPABILITIES]\nThe lookup finished; decoding is required.');
   assert.doesNotMatch(JSON.stringify(inputs[1]!.agentResponse), /Now decode|First I need/);
   assert.equal(agent.session.snapshotEvents().filter(e => e.type === 'just-enough-tools/continued').length, 1);
 });
 
 test('an unregistered tool cannot execute even if the model guesses its name', async t => {
   let called = false;
-  const adapter = new ScriptedAdapter([textResponse('plan'), callResponse('hidden'), textResponse('done')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), callResponse('hidden'), textResponse('done')]);
   const h = await harness(adapter, {
     catalog: [candidate('hidden', async () => { called = true; return 'bad'; })],
     scorer: { score: async () => ({ scores: { 'tool:hidden': 0 } }) },
@@ -60,7 +60,7 @@ test('an unregistered tool cannot execute even if the model guesses its name', a
 });
 
 test('invalid scores leave the entire batch closed and allow a final answer', async t => {
-  const adapter = new ScriptedAdapter([textResponse('plan'), textResponse('answer')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), textResponse('answer')]);
   const h = await harness(adapter, {
     catalog: [candidate('a'), candidate('b')],
     scorer: { score: async () => ({ scores: { 'tool:a': 0.9 } }) },
@@ -78,7 +78,7 @@ test('invalid scores leave the entire batch closed and allow a final answer', as
 test('a failed registration rolls back earlier tools and prompt sections in the same batch', async t => {
   const broken = candidate('b');
   broken.create = () => { throw new Error('registration failed'); };
-  const adapter = new ScriptedAdapter([textResponse('plan'), textResponse('answer')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), textResponse('answer')]);
   const h = await harness(adapter, {
     catalog: [candidate('a'), broken], scorer: { score: async () => ({ scores: { 'tool:a': 1, 'tool:b': 1 } }) },
   });
@@ -93,7 +93,7 @@ test('a failed registration rolls back earlier tools and prompt sections in the 
 });
 
 test('tool registration and execution are isolated between real agents', async t => {
-  const adapter = new ScriptedAdapter([textResponse('plan'), textResponse('answer')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), textResponse('answer')]);
   const h = await harness(adapter, { catalog: [candidate('a')], scorer: { score: async () => ({ scores: { 'tool:a': 1 } }) } });
   t.after(() => h.ctx.fiber.dispose());
   const a = await h.create('a');
@@ -109,7 +109,7 @@ test('tool registration and execution are isolated between real agents', async t
 
 test('preview assemblies do not rescore completed state or disclose more tools', async t => {
   let calls = 0;
-  const h = await harness(new ScriptedAdapter([textResponse('plan'), textResponse('answer')]), {
+  const h = await harness(new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), textResponse('answer')]), {
     catalog: [candidate('a')], scorer: { score: async () => { calls++; return { scores: { 'tool:a': 0 } }; } },
   });
   t.after(() => h.ctx.fiber.dispose());
@@ -117,13 +117,13 @@ test('preview assemblies do not rescore completed state or disclose more tools',
   await run(agent);
   await agent.ctx.systemPrompt.assemble(assembleContextFor(agent));
   await agent.ctx.systemPrompt.assemble(assembleContextFor(agent));
-  assert.equal(calls, 2);
+  assert.equal(calls, 1);
   assert.deepEqual(h.errors, []);
 });
 
 test('scoring timeout cannot later register tools', async t => {
   let release!: (value: { scores: Record<string, number> }) => void;
-  const h = await harness(new ScriptedAdapter([textResponse('plan'), textResponse('answer')]), {
+  const h = await harness(new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), textResponse('answer')]), {
     catalog: [candidate('a')], scoreTimeoutMs: 10,
     scorer: { score: () => new Promise(resolve => { release = resolve; }) },
   });
@@ -139,7 +139,7 @@ test('scoring timeout cannot later register tools', async t => {
 test('cancellation during scoring stops the turn and never admits late scores', async t => {
   const entered = Promise.withResolvers<void>();
   const late = Promise.withResolvers<ScoringResult>();
-  const adapter = new ScriptedAdapter([textResponse('plan')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan')]);
   const h = await harness(adapter, {
     catalog: [candidate('a')], scorer: { score: () => { entered.resolve(); return late.promise; } },
   });
@@ -158,7 +158,7 @@ test('cancellation during scoring stops the turn and never admits late scores', 
 
 test('the per-turn step limit bounds both executor and scorer requests', async t => {
   let scoringCalls = 0;
-  const adapter = new ScriptedAdapter([textResponse('plan'), callResponse('a'), textResponse('must not run')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), callResponse('a'), textResponse('must not run')]);
   const h = await harness(adapter, {
     catalog: [candidate('a'), candidate('b')], maxSteps: 2,
     scorer: { score: async () => { scoringCalls++; return { scores: { 'tool:a': 1, 'tool:b': 0 } }; } },
@@ -174,7 +174,7 @@ test('the per-turn step limit bounds both executor and scorer requests', async t
 });
 
 test('replayed session decisions restore local tools before a resumed agent is used', async t => {
-  const adapter = new ScriptedAdapter([textResponse('plan'), textResponse('answer')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), textResponse('answer')]);
   const h = await harness(adapter, { catalog: [candidate('a')], scorer: { score: async () => ({ scores: { 'tool:a': 1 } }) } });
   t.after(() => h.ctx.fiber.dispose());
   const original = await h.create('original');
@@ -193,7 +193,7 @@ test('replayed session decisions restore local tools before a resumed agent is u
 
 test('global execution guards still apply after a tool is dynamically registered', async t => {
   let executed = false;
-  const h = await harness(new ScriptedAdapter([textResponse('plan'), callResponse('a'), textResponse('denied')]), {
+  const h = await harness(new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), callResponse('a'), textResponse('denied')]), {
     catalog: [candidate('a', async () => { executed = true; return 'bad'; })],
     scorer: { score: async () => ({ scores: { 'tool:a': 1 } }) },
   });
@@ -210,7 +210,7 @@ test('global execution guards still apply after a tool is dynamically registered
 
 test('later scoring failures preserve tools already admitted in an earlier step', async t => {
   let count = 0;
-  const adapter = new ScriptedAdapter([textResponse('plan'), callResponse('a'), textResponse('answer')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), callResponse('a'), textResponse('answer')]);
   const h = await harness(adapter, {
     catalog: [candidate('a'), candidate('b')],
     scorer: { score: async () => {
@@ -229,7 +229,7 @@ test('later scoring failures preserve tools already admitted in an earlier step'
 
 test('no remaining candidates means no extra scoring while normal tool execution continues', async t => {
   let calls = 0;
-  const adapter = new ScriptedAdapter([textResponse('plan'), callResponse('a'), textResponse('answer')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), callResponse('a'), textResponse('answer')]);
   const h = await harness(adapter, {
     catalog: [candidate('a')], scorer: { score: async () => { calls++; return { scores: { 'tool:a': 1 } }; } },
   });
@@ -267,7 +267,7 @@ test('unmanaged schema providers cannot expose extra tools to the first request'
 
 test('a new user task reaches the scorer after its final Agent reply', async t => {
   const inputs: ScoringInput[] = [];
-  const adapter = new ScriptedAdapter([textResponse('plan'), textResponse('A completed'), textResponse('Need b for the new task'), callResponse('b'), textResponse('B completed')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), textResponse('A completed'), textResponse('[REQUEST_CAPABILITIES]\nNeed b for the new task'), callResponse('b'), textResponse('B completed')]);
   const h = await harness(adapter, {
     catalog: [candidate('a'), candidate('b')],
     scorer: { score: async (input): Promise<ScoringResult> => {
@@ -280,8 +280,8 @@ test('a new user task reaches the scorer after its final Agent reply', async t =
   await run(agent, 'First do A');
   await run(agent, 'Now do B');
   assert.deepEqual(h.errors, []);
-  assert.equal(inputs[2]!.task, 'First do A\nNow do B');
-  assert.match(JSON.stringify(inputs[1]!.agentResponse), /A completed/);
+  assert.equal(inputs[1]!.task, 'First do A\nNow do B');
+  assert.match(JSON.stringify(inputs[1]!.agentResponse), /Need b for the new task/);
   assert.doesNotMatch(JSON.stringify(inputs[1]!.agentResponse), /Now do B/);
   assert.deepEqual(adapter.requests[2]!.tools?.map(t => t.name), ['a']);
   assert.deepEqual(adapter.requests[3]!.tools?.map(t => t.name), ['a', 'b']);
@@ -298,19 +298,19 @@ test('Jev probabilities drive registration through the real Harness loop', async
       type: 'noul', noul: question.instructions.id === 'tool:read' ? 0.9 : 0.1,
     }])) }), { headers: { 'Content-Type': 'application/json' } });
   } });
-  const adapter = new ScriptedAdapter([textResponse('Need archive access'), callResponse('read'), textResponse('Done')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nNeed archive access'), callResponse('read'), textResponse('Done')]);
   const h = await harness(adapter, { catalog: [candidate('read'), candidate('write')], scorer });
   t.after(() => h.ctx.fiber.dispose());
   const agent = await h.create();
   await run(agent);
   assert.deepEqual(h.errors, []);
   assert.deepEqual(adapter.requests.map(r => r.tools?.map(tool => tool.name) ?? []), [[], ['read'], ['read']]);
-  assert.deepEqual(questionTools, [['tool:read', 'tool:write'], ['tool:write']]);
+  assert.deepEqual(questionTools, [['tool:read', 'tool:write']]);
   assert.ok(agent.session.snapshotEvents().some(e => e.type === 'tool/result' && !e.data.message.isError));
 });
 
 test('legacy tool-only decisions restore into the namespaced capability model', async t => {
-  const h = await harness(new ScriptedAdapter([textResponse('plan'), textResponse('answer')]), {
+  const h = await harness(new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), textResponse('answer')]), {
     catalog: [candidate('read')], scorer: { score: async () => ({ scores: { 'tool:read': 1 } }) },
   });
   t.after(() => h.ctx.fiber.dispose());
@@ -325,7 +325,7 @@ test('legacy tool-only decisions restore into the namespaced capability model', 
 });
 
 test('static native guidance stays hidden until admission and remains intact outside the agent', async t => {
-  const adapter = new ScriptedAdapter([textResponse('plan'), callResponse('bash'), textResponse('done')]);
+  const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), callResponse('bash'), textResponse('done')]);
   const h = await harness(adapter, {
     catalog: [candidate('bash'), candidate('unused')], inheritedGuidance: true,
     scorer: { score: async input => ({ scores: Object.fromEntries(input.candidates.map(id => [id, id === 'tool:bash' ? 0.9 : 0])) }) },
@@ -362,13 +362,13 @@ test('inherited guidance from an unknown capability still fails closed', async t
 test('scoring waits through tool calls and receives only the round final text', async t => {
   const replies: string[] = [];
   const adapter = new ScriptedAdapter([
-    textResponse('Plan'),
-    [...textResponse('Intermediate commentary').filter(chunk => chunk.type !== 'finish'), ...callResponse('read').map(chunk => 'index' in chunk ? { ...chunk, index: chunk.index + 1 } : chunk)],
+    textResponse('[REQUEST_CAPABILITIES]\nPlan'),
+    [...textResponse('[REQUEST_CAPABILITIES]\nIntermediate commentary').filter(chunk => chunk.type !== 'finish'), ...callResponse('read').map(chunk => 'index' in chunk ? { ...chunk, index: chunk.index + 1 } : chunk)],
     callResponse('read', 'second-read'),
     textResponse('Finished reading; no more work needed.'),
   ]);
   const h = await harness(adapter, {
-    catalog: [candidate('read', async () => { assert.deepEqual(replies, ['Plan']); return 'PRIVATE_TOOL_RESULT'; }), candidate('unused')],
+    catalog: [candidate('read', async () => { assert.deepEqual(replies, ['[REQUEST_CAPABILITIES]\nPlan']); return 'PRIVATE_TOOL_RESULT'; }), candidate('unused')],
     scorer: { score: async input => {
       replies.push(input.agentResponse);
       return { scores: Object.fromEntries(input.candidates.map(id => [id, id === 'tool:read' ? 0.9 : 0])) };
@@ -377,6 +377,6 @@ test('scoring waits through tool calls and receives only the round final text', 
   t.after(() => h.ctx.fiber.dispose());
   const agent = await h.create(); await run(agent);
   assert.deepEqual(h.errors, []);
-  assert.deepEqual(replies, ['Plan', 'Finished reading; no more work needed.']);
+  assert.deepEqual(replies, ['[REQUEST_CAPABILITIES]\nPlan']);
   assert.equal(adapter.requests.length, 4);
 });
