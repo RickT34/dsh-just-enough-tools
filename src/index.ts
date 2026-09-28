@@ -128,8 +128,7 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
   const discovered = new Set<string>();
   const claimedMessages = new Map<string, UserMessage>();
   const lifetime = new AbortController();
-  let lastScoredTurn = -1;
-  let lastScored = -1, skillRevision = 0, lastScoredSkillRevision = 0;
+  let lastScored = -1;
   let continued = false, disposed = false, changing = false, catalogComplete = true;
   let scoring: Promise<void> | undefined;
   let preparation: Promise<boolean> | undefined;
@@ -196,7 +195,7 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
       }
       for (const id of added) {
         enabled.add(id);
-        if (loaded.has(id)) { activeSkills.set(id, loaded.get(id)!); skillRevision++; }
+        if (loaded.has(id)) { activeSkills.set(id, loaded.get(id)!); }
       }
       registrations.push(...batch);
     } catch (error) { batch.reverse().forEach(dispose => dispose()); throw error; }
@@ -238,17 +237,15 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
       if (pendingRestore.some(id => !catalog.has(id))) throw new Error('Resumed session references unavailable skills.');
       await admit(pendingRestore, signal);
       pendingRestore = [];
-      lastScoredSkillRevision = skillRevision;
       return true;
     }
     return false;
   };
   const prepare = (signal: AbortSignal) => preparation ??= refresh(signal).finally(() => { preparation = undefined; });
   const scoreStep = async (afterStepSeq: number, signal: AbortSignal) => {
-    lastScoredTurn = agent.session.snapshotEvents().findLast(e => e.type === 'turn/start')?.seq ?? -1;
     const candidates = remaining();
     if (!candidates.length) {
-      lastScored = afterStepSeq; lastScoredSkillRevision = skillRevision;
+      lastScored = afterStepSeq;
       if (config.debug?.()) writeRoutingDiagnostic(`[Just enough tools] session=${agent.session.id} no remaining candidates; enabled=${JSON.stringify([...enabled])}; catalogComplete=${catalogComplete}`);
       return;
     }
@@ -260,14 +257,14 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
       const history = agent.session.deriveMessages();
       const committedIds = new Set(history.map(m => m.id));
       const pending = [...claimedMessages.values()].filter(m => !committedIds.has(m.id));
-      const progress = [...history, ...pending].filter(m => m.role !== 'system' && m.role !== 'developer' && m.source.kind !== 'just-enough-tools-skill')
-        .map(m => ({ role: m.role, content: m.content.filter(b => b.type !== 'reasoning') }));
+      const reply = history.findLast(message => message.role === 'assistant');
+      const agentResponse = reply && !reply.content.some(block => block.type === 'tool-call')
+        ? reply.content.filter(block => block.type === 'text').map(block => block.text).join('\n') : '';
       const priorTasks = agent.session.snapshotEvents().filter(e => e.type === 'user/message' && e.data.source.kind === 'user')
         .flatMap(e => e.type === 'user/message' ? [e.data] : []);
       const task = [...priorTasks, ...pending.filter(m => m.source.kind === 'user')]
         .map(m => m.content.filter(b => b.type === 'text').map(b => b.text).join('\n')).join('\n');
-      lastScoredSkillRevision = skillRevision;
-      result = await bounded(callSignal => scorer.score({ task, progress, candidates, enabled: [...enabled],
+      result = await bounded(callSignal => scorer.score({ task, agentResponse, candidates, enabled: [...enabled],
         allCapabilities: [...catalog.values()].map(summary),
         activeSkills: [...activeSkills].map(([id, instructions]) => ({ id, name: catalog.get(id)!.name, instructions })),
       }, callSignal), signal, timeoutMs);
@@ -331,15 +328,7 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
       if ((context as AssembleContext & { [REASSEMBLED]?: boolean })[REASSEMBLED]) return checkAssembly(await next());
       if ((context.signal || pendingRestore.length) && !disposed) {
         const signal = context.signal ? AbortSignal.any([context.signal, lifetime.signal]) : lifetime.signal;
-        let rebuild = await prepare(signal);
-        const completed = steps();
-        const latest = completed.at(-1);
-        const latestTurn = agent.session.snapshotEvents().findLast(e => e.type === 'turn/start');
-        const inTurn = completed.filter(e => e.seq > (latestTurn?.seq ?? -1)).length;
-        if (context.signal && latest && (latest.seq > lastScored
-          || (latestTurn && latestTurn.seq > latest.seq && latestTurn.seq !== lastScoredTurn)) && inTurn < maxSteps) {
-          await scoreOnce(latest.seq, signal); rebuild = true;
-        }
+        const rebuild = await prepare(signal);
         signal.throwIfAborted();
         if (rebuild) return checkAssembly(await ctx.systemPrompt.assemble({ ...context, [REASSEMBLED]: true } as AssembleContext));
       }
@@ -368,6 +357,17 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
     }, { prepend: true }));
     disposers.push(ctx.on('agent/turn-stopping', async ({ signal, turn }) => {
       signal = AbortSignal.any([signal, lifetime.signal]); signal.throwIfAborted();
+      const completed = steps();
+      const latestStep = completed.at(-1);
+      const replyAtStop = agent.session.deriveMessages().findLast(message => message.role === 'assistant');
+      if (!latestStep || latestStep.data.turn !== turn || replyAtStop?.content.some(block => block.type === 'tool-call')
+        || !replyAtStop?.content.some(block => block.type === 'text' && block.text.trim())) return;
+      const before = enabled.size;
+      const canContinue = completed.filter(s => s.data.turn === turn).length < maxSteps;
+      if (canContinue) {
+        await prepare(signal);
+        if (latestStep.seq > lastScored) await scoreOnce(latestStep.seq, signal);
+      }
       if (!continued && steps().length === 1) {
         const latest = steps()[0]!;
         const reply = agent.session.deriveMessages().findLast(message => message.role === 'assistant');
@@ -375,8 +375,6 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
         const direct = /^No external capabilities needed\.[\r\n]+\s*\S/.test(text)
           && !reply?.content.some(block => block.type === 'tool-call');
         if (direct) {
-          await prepare(signal);
-          if (latest.seq > lastScored) await scoreOnce(latest.seq, signal);
           signal.throwIfAborted();
           const event = agent.session.snapshotEvents().findLast(e => e.type === 'just-enough-tools/decision');
           const belowThreshold = remaining().length === 0 && enabled.size === 0
@@ -392,13 +390,8 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
         continued = true;
         steer('Continue the original task according to your plan. Use the tools and skills enabled for this step when needed; otherwise answer directly.');
         agent.session.append('just-enough-tools/continued', { version: 1 });
-      } else if (skillRevision > lastScoredSkillRevision && steps().filter(s => s.data.turn === turn).length < maxSteps) {
-        // A newly read skill may reveal dependencies that its summary did not mention.
-        await prepare(signal);
-        const latest = steps().at(-1);
-        const before = enabled.size;
-        if (latest) await scoreOnce(latest.seq, signal);
-        if (enabled.size > before) steer('Additional capabilities have been enabled based on skill instructions and current progress. Continue the original task.');
+      } else if (canContinue && enabled.size > before) {
+        steer('Additional capabilities have been enabled based on your response. Continue the original task.');
       }
     }));
     ctx.effect(() => cleanup); installed.add(agent); return cleanup;

@@ -22,7 +22,7 @@ function text(request: GenerateOptions): string {
 test('same-named tools and skills are independently scored and a skill at the threshold stays hidden', async t => {
   const inputs: ScoringInput[] = [];
   let loaded = 0;
-  const adapter = new ScriptedAdapter([textResponse('plan'), callResponse('read'), textResponse('done')]);
+  const adapter = new ScriptedAdapter([textResponse('plan'), callResponse('read'), textResponse('Need the workflow'), textResponse('done')]);
   const h = await harness(adapter, {
     catalog: [candidate('read'), skill('read', '', async () => { loaded++; return 'SKILL_BODY {{literal}}'; })],
     scorer: { score: async (input): Promise<ScoringResult> => {
@@ -40,11 +40,11 @@ test('same-named tools and skills are independently scored and a skill at the th
   assert.ok(!JSON.stringify(inputs[0]).includes('SKILL_BODY'));
   assert.doesNotMatch(text(adapter.requests[0]!), /SKILL_BODY/);
   assert.doesNotMatch(text(adapter.requests[1]!), /SKILL_BODY/);
-  assert.match(text(adapter.requests[2]!), /SKILL_BODY \{\{literal\}\}/);
+  assert.match(text(adapter.requests[3]!), /SKILL_BODY \{\{literal\}\}/);
   assert.equal(loaded, 1);
-  const injection = adapter.requests[2]!.messages.find(m => 'source' in m && m.source?.kind === 'just-enough-tools-skill');
+  const injection = adapter.requests[3]!.messages.find(m => 'source' in m && m.source?.kind === 'just-enough-tools-skill');
   assert.equal(injection?.role, 'user', 'skills must not become higher-priority system instructions');
-  assert.deepEqual(adapter.requests.map(r => r.tools?.map(t => t.name) ?? []), [[], ['read'], ['read']]);
+  assert.deepEqual(adapter.requests.map(r => r.tools?.map(t => t.name) ?? []), [[], ['read'], ['read'], ['read']]);
 });
 
 test('a skill can be admitted without enabling any tool or generic skill loader', async t => {
@@ -125,7 +125,7 @@ test('skill state survives session replay without duplicating already-present in
 test('newly discovered skills join the next decision without reopening existing tools', async t => {
   let published = false;
   const inputs: ScoringInput[] = [];
-  const adapter = new ScriptedAdapter([textResponse('plan'), callResponse('read'), textResponse('done')]);
+  const adapter = new ScriptedAdapter([textResponse('plan'), callResponse('read'), textResponse('Need the workflow'), textResponse('done')]);
   const h = await harness(adapter, {
     catalog: [candidate('read', async () => { published = true; return 'New workflow available'; })],
     discoverSkills: async () => ({ skills: published ? [skill('late', 'LATE_WORKFLOW')] : [], complete: true }),
@@ -138,7 +138,7 @@ test('newly discovered skills join the next decision without reopening existing 
   const agent = await h.create(); await run(agent);
   assert.deepEqual(h.errors, []);
   assert.deepEqual(inputs.map(i => i.candidates), [['tool:read'], ['skill:late']]);
-  assert.match(text(adapter.requests[2]!), /LATE_WORKFLOW/);
+  assert.match(text(adapter.requests[3]!), /LATE_WORKFLOW/);
 });
 
 test('instructions revealed by a skill can trigger a later independent tool admission', async t => {
@@ -201,7 +201,7 @@ test('filesystem discovery respects invocation policy and retains resource paths
 test('an incomplete discovery retains the last-known skill instead of dropping it', async t => {
   let discovery = 0;
   const inputs: ScoringInput[] = [];
-  const adapter = new ScriptedAdapter([textResponse('plan'), callResponse('read'), textResponse('done')]);
+  const adapter = new ScriptedAdapter([textResponse('plan'), callResponse('read'), textResponse('Need the workflow'), textResponse('done')]);
   const h = await harness(adapter, {
     catalog: [candidate('read')],
     discoverSkills: async () => ++discovery === 1 ? { skills: [skill('workflow')], complete: true } : { skills: [], complete: false },
@@ -214,7 +214,7 @@ test('an incomplete discovery retains the last-known skill instead of dropping i
   const agent = await h.create(); await run(agent);
   assert.deepEqual(h.errors, []);
   assert.deepEqual(inputs[1]!.candidates, ['skill:workflow']);
-  assert.match(text(adapter.requests[2]!), /Instructions for workflow/);
+  assert.match(text(adapter.requests[3]!), /Instructions for workflow/);
   const decision = agent.session.snapshotEvents().find(e => e.type === 'just-enough-tools/decision');
   assert.equal(decision?.type === 'just-enough-tools/decision' && decision.data.catalogComplete, false);
 });

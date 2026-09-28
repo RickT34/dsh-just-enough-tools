@@ -26,7 +26,7 @@ for (const protocol of ['systemone', 'vercel', 'openai'] as const) test(`only Ju
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify(protocol === 'openai'
       ? { choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ scores: Object.fromEntries(
-        JSON.parse(body.messages[1].content).candidates.map((id: string) => [id, 0.9]),
+        JSON.parse(body.messages[1].content).candidates.map(({ id }: { id: string }) => [id, 0.9]),
       ) }) } }] }
       : {answers:Object.fromEntries(Object.keys(body.questions).map(id=>[id,protocol === 'vercel' ? {type:'boolean',probability:0.9} : {type:'noul',noul:0.9}]))}));
   });
@@ -97,14 +97,14 @@ test('switching a blank conversation into and out of Just enough tools restores 
 });
 
 test('Just enough tools mode scores registry skills alongside tools without exposing the native skill loader', async t => {
-  const seen: Array<{ questions: Record<string, { instructions: { capability_kind: string } }>; state: { all_capabilities: Array<{ id: string }>; active_skills: Array<{ instructions: string }> } }> = [];
+  const seen: Array<{ questions: Record<string, { instructions: { id: string } }>; state: { all_capabilities: Array<{ id: string }>; active_skills: Array<{ instructions: string }> } }> = [];
   const server = createServer(async (req, res) => {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     const body = JSON.parse(Buffer.concat(chunks).toString()); seen.push(body);
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ answers: Object.fromEntries(Object.entries(body.questions).map(([id, question]) => [id, {
-      type: 'noul', noul: (question as { instructions: { capability_kind: string } }).instructions.capability_kind === 'skill' ? 0.9 : 0,
+      type: 'noul', noul: (question as { instructions: { id: string } }).instructions.id.startsWith('skill:') ? 0.9 : 0,
     }])) }));
   });
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
@@ -125,7 +125,7 @@ test('Just enough tools mode scores registry skills alongside tools without expo
     setup: async ctx => { await h.ctx.agentPresets.mount(ctx, 'just-enough-tools'); } });
   await run(agent);
   assert.deepEqual(h.errors, []);
-  assert.deepEqual(seen[0]!.state.all_capabilities.map(c => c.id), ['tool:read', 'skill:read']);
+  assert.deepEqual(Object.values(seen[0]!.questions).map(q => q.instructions.id), ['tool:read', 'skill:read']);
   assert.ok(!JSON.stringify(seen[0]).includes('REGISTERED_SKILL_BODY'));
   assert.match(seen[1]!.state.active_skills[0]!.instructions, /REGISTERED_SKILL_BODY/);
   assert.deepEqual(adapter.requests.map(r => r.tools ?? []), [[], []]);

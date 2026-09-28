@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1460" viewBox="0 0 1200 1460" role="img" aria-labelledby="title desc"><title id="title">Just enough tools</title><desc id="desc">Agent thinks without capabilities. Jev scores tools and skills. The plugin unlocks scores above threshold. Agent acts and supplies final text for re-scoring remaining capabilities.</desc><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M1 1 L7 4 L1 7" fill="none" stroke="#65778c" stroke-width="1.5" /></marker></defs><g font-family="Arial,Helvetica,sans-serif">
+<rect x="0" y="0" width="1200" height="1460" rx="20" fill="#f5f8fc" stroke="none" />
+<text x="70" y="56" font-size="34" fill="#20364f" font-weight="700" text-anchor="start">Just enough tools</text>
+<text x="70" y="89" font-size="20" fill="#65778c" font-weight="400" text-anchor="start">Think first. Add tools and skills as the task needs them.</text>
+<path d="M425,105 L425,127" fill="none" stroke="#65778c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" />
+<rect x="80" y="140" width="690" height="210" rx="14" fill="#ffffff" stroke="#bfd8e7" />
+<g transform="translate(112 186) scale(1.6)"><rect x="2" y="8" width="36" height="27" rx="4" fill="#aeb9c4" /><path d="M20 8V2" stroke="#8c9cab" stroke-width="2" /><circle cx="20" cy="2" r="2" fill="#ee6b61" /><rect x="5" y="11" width="30" height="19" rx="2" fill="#b4e2ed" /><g fill="white"><circle cx="11" cy="17" r="4" /><circle cx="29" cy="17" r="4" /></g><g fill="#354b62"><circle cx="11" cy="17" r="2" /><circle cx="29" cy="17" r="2" /></g><path d="M12 26H28" stroke="#354b62" stroke-width="2" /><path d="M1 15V26M39 15V26" stroke="#ee6b61" stroke-width="3" /></g>
+<text x="208" y="178" font-size="16" fill="#167b9d" font-weight="700" text-anchor="start">01 / AGENT</text>
+<text x="208" y="215" font-size="28" fill="#20364f" font-weight="700" text-anchor="start">Think first</text>
+<text x="208" y="248" font-size="20" fill="#65778c" font-weight="400" text-anchor="start">Start with no tools or skills.</text>
+<text x="208" y="277" font-size="18" fill="#65778c" font-weight="400" text-anchor="start">Answer directly or explain which capabilities are needed.</text>
+<rect x="108" y="296" width="634" height="36" rx="8" fill="#edf5fb" stroke="none" />
+<text x="123" y="321" font-size="18" fill="#20364f" font-weight="400" text-anchor="start">"I need to inspect the login flow and find the cause."</text>
+<g transform="translate(0 318)"><rect x="810" y="140" width="320" height="282" rx="14" fill="#edf2f8" stroke="none" />
+<text x="834" y="175" font-size="16" fill="#65778c" font-weight="700" text-anchor="start">CAPABILITY POOL</text>
+<text x="834" y="203" font-size="17" fill="#65778c" font-weight="400" text-anchor="start">Tools + skills, scored independently</text>
+<rect x="833" y="218" width="127" height="83" rx="9" fill="#ffffff" stroke="#dce4ed" />
+<g transform="translate(878 226) scale(0.9)"><path d="M5 2H25L34 11V39H5Z" fill="white" stroke="#bbc7d4" /><path d="M25 2V11H34" fill="#9bd2ec" /><path d="M11 19H28M11 25H28M11 31H28" stroke="#71aaca" stroke-width="2" /></g>
+<text x="896.5" y="286" font-size="16" fill="#167b9d" font-weight="400" text-anchor="middle">read</text>
+<rect x="974" y="218" width="127" height="83" rx="9" fill="#ffffff" stroke="#dce4ed" />
+<g transform="translate(1019 226) scale(0.9)"><rect x="3" y="27" width="34" height="10" rx="2" fill="#439ccc" /><path d="M8 32H35" stroke="white" stroke-width="4" /><rect x="3" y="16" width="34" height="10" rx="2" fill="#52ad85" /><path d="M8 21H35" stroke="white" stroke-width="4" /><rect x="3" y="5" width="34" height="10" rx="2" fill="#e47972" /><path d="M8 10H35" stroke="white" stroke-width="4" /></g>
+<text x="1037.5" y="286" font-size="16" fill="#8559bb" font-weight="400" text-anchor="middle">login-debug</text>
+<rect x="833" y="315" width="127" height="83" rx="9" fill="#ffffff" stroke="#dce4ed" />
+<g transform="translate(878 323) scale(0.9)"><g transform="rotate(38 20 20)"><path d="M15 7H25V31H15Z" fill="#f6c54b" /><path d="M15 1H25V7H15Z" fill="#ea92a7" /><path d="M15 31H25L20 39Z" fill="#d8b78c" /><path d="M18 36H22L20 39Z" fill="#3d4e5f" /></g></g>
+<text x="896.5" y="383" font-size="16" fill="#167b9d" font-weight="400" text-anchor="middle">edit</text>
+<rect x="974" y="315" width="127" height="83" rx="9" fill="#ffffff" stroke="#dce4ed" />
+<g transform="translate(1019 323) scale(0.9)"><rect x="4" y="4" width="32" height="25" rx="2" fill="#8596a8" /><path d="M7 7H33V26H7Z" fill="#b8e3ef" /><path d="M4 29H36L40 37H0Z" fill="#bcc7d3" /><path d="M11 15L16 19L11 23" fill="none" stroke="white" stroke-width="2" /></g>
+<text x="1037.5" y="383" font-size="16" fill="#167b9d" font-weight="400" text-anchor="middle">bash</text>
+</g><path d="M425,350 L425,398" fill="none" stroke="#65778c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" />
+<text x="444" y="380" font-size="17" fill="#65778c" font-weight="400" text-anchor="start">Latest final text</text>
+<rect x="80" y="410" width="690" height="330" rx="14" fill="#ffffff" stroke="#d9c9eb" />
+<text x="108" y="448" font-size="16" fill="#8559bb" font-weight="700" text-anchor="start">02 / JEV</text>
+<g transform="translate(694 422) scale(0.9)"><g fill="#efa8bb"><ellipse cx="12" cy="20" rx="11" ry="16" /><ellipse cx="28" cy="20" rx="11" ry="16" /></g><path d="M20 7V33M9 11L14 15L9 21L14 26M31 11L26 15L31 21L26 26" stroke="#cb708e" fill="none" stroke-width="1.5" /></g>
+<text x="108" y="486" font-size="27" fill="#20364f" font-weight="700" text-anchor="start">Score the remaining capabilities</text>
+<text x="108" y="518" font-size="18" fill="#65778c" font-weight="400" text-anchor="start">How necessary is each capability for the work still ahead?</text>
+<g transform="translate(108 536) scale(0.9)"><path d="M5 2H25L34 11V39H5Z" fill="white" stroke="#bbc7d4" /><path d="M25 2V11H34" fill="#9bd2ec" /><path d="M11 19H28M11 25H28M11 31H28" stroke="#71aaca" stroke-width="2" /></g>
+<text x="162" y="563" font-size="19" fill="#167b9d" font-weight="400" text-anchor="start">read</text>
+<rect x="380" y="546" width="230" height="18" rx="8" fill="#e9edf4" stroke="none" />
+<rect x="380" y="546" width="216.2" height="18" rx="8" fill="#167b9d" stroke="none" />
+<text x="641" y="563" font-size="19" fill="#167b9d" font-weight="400" text-anchor="start">0.94</text>
+<g transform="translate(108 580) scale(0.9)"><rect x="3" y="27" width="34" height="10" rx="2" fill="#439ccc" /><path d="M8 32H35" stroke="white" stroke-width="4" /><rect x="3" y="16" width="34" height="10" rx="2" fill="#52ad85" /><path d="M8 21H35" stroke="white" stroke-width="4" /><rect x="3" y="5" width="34" height="10" rx="2" fill="#e47972" /><path d="M8 10H35" stroke="white" stroke-width="4" /></g>
+<text x="162" y="607" font-size="19" fill="#8559bb" font-weight="400" text-anchor="start">login-debug</text>
+<rect x="380" y="590" width="230" height="18" rx="8" fill="#e9edf4" stroke="none" />
+<rect x="380" y="590" width="202.4" height="18" rx="8" fill="#8559bb" stroke="none" />
+<text x="641" y="607" font-size="19" fill="#8559bb" font-weight="400" text-anchor="start">0.88</text>
+<g transform="translate(108 624) scale(0.9)"><g transform="rotate(38 20 20)"><path d="M15 7H25V31H15Z" fill="#f6c54b" /><path d="M15 1H25V7H15Z" fill="#ea92a7" /><path d="M15 31H25L20 39Z" fill="#d8b78c" /><path d="M18 36H22L20 39Z" fill="#3d4e5f" /></g></g>
+<text x="162" y="651" font-size="19" fill="#167b9d" font-weight="400" text-anchor="start">edit</text>
+<rect x="380" y="634" width="230" height="18" rx="8" fill="#e9edf4" stroke="none" />
+<rect x="380" y="634" width="73.60000000000001" height="18" rx="8" fill="#167b9d" stroke="none" />
+<text x="641" y="651" font-size="19" fill="#167b9d" font-weight="400" text-anchor="start">0.32</text>
+<g transform="translate(108 668) scale(0.9)"><rect x="4" y="4" width="32" height="25" rx="2" fill="#8596a8" /><path d="M7 7H33V26H7Z" fill="#b8e3ef" /><path d="M4 29H36L40 37H0Z" fill="#bcc7d3" /><path d="M11 15L16 19L11 23" fill="none" stroke="white" stroke-width="2" /></g>
+<text x="162" y="695" font-size="19" fill="#167b9d" font-weight="400" text-anchor="start">bash</text>
+<rect x="380" y="678" width="230" height="18" rx="8" fill="#e9edf4" stroke="none" />
+<rect x="380" y="678" width="48.3" height="18" rx="8" fill="#167b9d" stroke="none" />
+<text x="641" y="695" font-size="19" fill="#167b9d" font-weight="400" text-anchor="start">0.21</text>
+<path d="M495,535 L495,704" fill="none" stroke="#c7d0db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 6" />
+<text x="495" y="727" font-size="16" fill="#65778c" font-weight="400" text-anchor="middle">Threshold 0.50</text>
+<path d="M810,590 L780,590" fill="none" stroke="#65778c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" stroke-dasharray="6 6" />
+<g transform="translate(0 -325)"><rect x="810" y="465" width="320" height="275" rx="14" fill="#ffffff" stroke="#dce4ed" />
+<text x="834" y="500" font-size="16" fill="#65778c" font-weight="700" text-anchor="start">EXAMPLE TASK</text>
+<text x="834" y="536" font-size="24" fill="#20364f" font-weight="700" text-anchor="start">Fix the login error</text>
+<text x="834" y="568" font-size="24" fill="#20364f" font-weight="700" text-anchor="start">and run the tests.</text>
+<text x="834" y="608" font-size="17" fill="#65778c" font-weight="400" text-anchor="start">Jev sees the task, latest final text,</text>
+<text x="834" y="634" font-size="17" fill="#65778c" font-weight="400" text-anchor="start">candidate summaries and enabled</text>
+<text x="834" y="660" font-size="17" fill="#65778c" font-weight="400" text-anchor="start">capabilities / active skill instructions.</text>
+<text x="834" y="706" font-size="16" fill="#65778c" font-weight="400" text-anchor="start">Scores shown are illustrative.</text>
+</g><path d="M425,740 L425,786" fill="none" stroke="#65778c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" />
+<rect x="80" y="798" width="690" height="170" rx="14" fill="#eaf6f0" stroke="#b5dac9" />
+<text x="108" y="837" font-size="16" fill="#168369" font-weight="700" text-anchor="start">03 / PLUGIN</text>
+<g transform="translate(687 813) scale(1.05)"><path d="M11 17V3H29V9" fill="none" stroke="#8fa2b2" stroke-width="4" stroke-linejoin="round" /><rect x="5" y="15" width="30" height="23" rx="3" fill="#f2c451" /><circle cx="20" cy="24" r="3" fill="#967638" /><path d="M20 25V31" stroke="#967638" stroke-width="2" /></g>
+<text x="108" y="876" font-size="26" fill="#20364f" font-weight="700" text-anchor="start">Enable capabilities above the threshold</text>
+<text x="108" y="913" font-size="19" fill="#20364f" font-weight="400" text-anchor="start">Tools: register calls and expose schemas / guidance.</text>
+<text x="108" y="944" font-size="19" fill="#20364f" font-weight="400" text-anchor="start">Skills: load full instructions into the Agent context.</text>
+<rect x="810" y="798" width="320" height="170" rx="14" fill="#ffffff" stroke="#dce4ed" />
+<text x="834" y="832" font-size="16" fill="#168369" font-weight="700" text-anchor="start">ENABLED NOW</text>
+<rect x="833" y="846" width="127" height="83" rx="9" fill="#ffffff" stroke="#dce4ed" />
+<g transform="translate(878 854) scale(0.9)"><path d="M5 2H25L34 11V39H5Z" fill="white" stroke="#bbc7d4" /><path d="M25 2V11H34" fill="#9bd2ec" /><path d="M11 19H28M11 25H28M11 31H28" stroke="#71aaca" stroke-width="2" /></g>
+<text x="896.5" y="914" font-size="16" fill="#167b9d" font-weight="400" text-anchor="middle">read</text>
+<rect x="974" y="846" width="127" height="83" rx="9" fill="#ffffff" stroke="#dce4ed" />
+<g transform="translate(1019 854) scale(0.9)"><rect x="3" y="27" width="34" height="10" rx="2" fill="#439ccc" /><path d="M8 32H35" stroke="white" stroke-width="4" /><rect x="3" y="16" width="34" height="10" rx="2" fill="#52ad85" /><path d="M8 21H35" stroke="white" stroke-width="4" /><rect x="3" y="5" width="34" height="10" rx="2" fill="#e47972" /><path d="M8 10H35" stroke="white" stroke-width="4" /></g>
+<text x="1037.5" y="914" font-size="16" fill="#8559bb" font-weight="400" text-anchor="middle">login-debug</text>
+<text x="834" y="952" font-size="17" fill="#65778c" font-weight="400" text-anchor="start">edit and bash remain hidden.</text>
+<path d="M770,882 L801,882" fill="none" stroke="#65778c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" />
+<path d="M425,968 L425,1014" fill="none" stroke="#65778c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" />
+<rect x="80" y="1026" width="690" height="198" rx="14" fill="#ffffff" stroke="#bfd8e7" />
+<g transform="translate(112 1070) scale(1.6)"><rect x="2" y="8" width="36" height="27" rx="4" fill="#aeb9c4" /><path d="M20 8V2" stroke="#8c9cab" stroke-width="2" /><circle cx="20" cy="2" r="2" fill="#ee6b61" /><rect x="5" y="11" width="30" height="19" rx="2" fill="#b4e2ed" /><g fill="white"><circle cx="11" cy="17" r="4" /><circle cx="29" cy="17" r="4" /></g><g fill="#354b62"><circle cx="11" cy="17" r="2" /><circle cx="29" cy="17" r="2" /></g><path d="M12 26H28" stroke="#354b62" stroke-width="2" /><path d="M1 15V26M39 15V26" stroke="#ee6b61" stroke-width="3" /></g>
+<text x="208" y="1065" font-size="16" fill="#167b9d" font-weight="700" text-anchor="start">04 / AGENT</text>
+<text x="208" y="1102" font-size="26" fill="#20364f" font-weight="700" text-anchor="start">Act with selected capabilities</text>
+<text x="208" y="1135" font-size="18" fill="#65778c" font-weight="400" text-anchor="start">Follow login-debug and read the relevant code.</text>
+<rect x="108" y="1164" width="634" height="39" rx="8" fill="#edf5fb" stroke="none" />
+<text x="123" y="1190" font-size="18" fill="#20364f" font-weight="400" text-anchor="start">"I found the bug. I need to edit the code and run tests."</text>
+<rect x="810" y="1026" width="320" height="198" rx="14" fill="#f1ecf8" stroke="#d9c9eb" />
+<text x="834" y="1062" font-size="16" fill="#8559bb" font-weight="700" text-anchor="start">NEXT / JEV + PLUGIN</text>
+<text x="834" y="1096" font-size="17" fill="#20364f" font-weight="400" text-anchor="start">Re-score only remaining candidates.</text>
+<g transform="translate(832 1109) scale(0.9)"><g transform="rotate(38 20 20)"><path d="M15 7H25V31H15Z" fill="#f6c54b" /><path d="M15 1H25V7H15Z" fill="#ea92a7" /><path d="M15 31H25L20 39Z" fill="#d8b78c" /><path d="M18 36H22L20 39Z" fill="#3d4e5f" /></g></g>
+<text x="882" y="1135" font-size="18" fill="#167b9d" font-weight="400" text-anchor="start">edit: 0.97</text>
+<g transform="translate(988 1109) scale(0.9)"><rect x="4" y="4" width="32" height="25" rx="2" fill="#8596a8" /><path d="M7 7H33V26H7Z" fill="#b8e3ef" /><path d="M4 29H36L40 37H0Z" fill="#bcc7d3" /><path d="M11 15L16 19L11 23" fill="none" stroke="white" stroke-width="2" /></g>
+<text x="1033" y="1135" font-size="16" fill="#167b9d" font-weight="400" text-anchor="start">bash: 0.93</text>
+<text x="834" y="1176" font-size="18" fill="#20364f" font-weight="400" text-anchor="start">Add edit + bash; keep read</text>
+<text x="834" y="1203" font-size="18" fill="#20364f" font-weight="400" text-anchor="start">and login-debug available.</text>
+<path d="M770,1121 L801,1121" fill="none" stroke="#65778c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" stroke-dasharray="6 6" />
+<path d="M80,1185 L39,1185 L39,478 L74,478" fill="none" stroke="#65778c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" stroke-dasharray="6 6" />
+<text x="80" y="1257" font-size="18" fill="#65778c" font-weight="400" text-anchor="start">Repeat after the final reply, not during tool calls.</text>
+<path d="M425,1270 L425,1300" fill="none" stroke="#65778c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" />
+<rect x="80" y="1312" width="690" height="110" rx="14" fill="#eaf6f0" stroke="#b5dac9" />
+<text x="108" y="1347" font-size="16" fill="#168369" font-weight="700" text-anchor="start">FINISH / AGENT</text>
+<g transform="translate(692 1326) scale(0.85)"><rect x="2" y="2" width="36" height="36" rx="4" fill="#46a87d" /><path d="M9 19L17 28L31 11" stroke="white" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round" /></g>
+<text x="108" y="1379" font-size="23" fill="#20364f" font-weight="700" text-anchor="start">"Fixed the login error; tests passed."</text>
+<text x="108" y="1407" font-size="17" fill="#65778c" font-weight="400" text-anchor="start">After re-scoring, no new admissions means the turn ends.</text>
+<rect x="810" y="1312" width="320" height="110" rx="14" fill="#ffffff" stroke="#dce4ed" />
+<text x="834" y="1347" font-size="16" fill="#65778c" font-weight="700" text-anchor="start">SIMPLE TASK SHORTCUT</text>
+<text x="834" y="1377" font-size="17" fill="#20364f" font-weight="400" text-anchor="start">A verified complete first answer</text>
+<text x="834" y="1403" font-size="17" fill="#20364f" font-weight="400" text-anchor="start">can skip the second Agent call.</text>
+</g></svg>

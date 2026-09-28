@@ -6,7 +6,7 @@ import { JevScorer, validateScores, jevConfigFromEnv } from '../src/scorer.js';
 import type { ScoringInput } from '../src/scorer.js';
 
 const input: ScoringInput = {
-  task: 'Read records', progress: [{ role: 'assistant', content: 'Need external records' }],
+  task: 'Read records', agentResponse: 'Need external records',
   allCapabilities: [
     { kind: 'tool', id: 'tool:read', name: 'read', description: 'Read records', parameters: {}, guidance: 'Use IDs' },
     { kind: 'tool', id: 'tool:search', name: 'search', description: 'Search records', parameters: {}, guidance: '' },
@@ -20,7 +20,7 @@ function mockResponse(data: unknown): typeof fetch {
   return async () => new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
 }
 
-test('Jev batches independent Noul questions, explicitly names tools, and preserves the full state', async t => {
+test('Jev batches independent Noul questions, identifies candidates and sends compact shared context', async t => {
   let received: { path?: string; authorization?: string; body: Record<string, unknown> } | undefined;
   const server = createServer(async (req, res) => {
     const buffers = [];
@@ -45,12 +45,17 @@ test('Jev batches independent Noul questions, explicitly names tools, and preser
   assert.equal(received?.body.model, 'jev-latest');
   assert.equal(received?.body.messages, undefined);
   assert.equal(received?.body.response_format, undefined);
-  assert.deepEqual(received?.body.state, { task: input.task, progress: input.progress, all_capabilities: input.allCapabilities, enabled_capabilities: ['tool:search'], active_skills: [] });
-  const questions = received?.body.questions as Record<string, { type: string; instructions: { capability_name: string } }>;
+  const state = received?.body.state as any;
+  assert.equal(state.task, input.task);
+  assert.deepEqual(state.agent_response, input.agentResponse);
+  assert.deepEqual(state.enabled, [{ id: 'tool:search', description: 'Search records' }]);
+  assert.equal(state.all_capabilities, undefined);
+  assert.equal(state.active_skills, undefined);
+  const questions = received?.body.questions as Record<string, { type: string; instructions: { id: string } }>;
   assert.deepEqual(Object.keys(questions), ['capability_0', 'capability_1']);
   assert.equal(questions.capability_0?.type, 'noul');
-  assert.equal(questions.capability_0?.instructions.capability_name, 'read');
-  assert.equal(questions.capability_1?.instructions.capability_name, 'write');
+  assert.equal(questions.capability_0?.instructions.id, 'tool:read');
+  assert.equal(questions.capability_1?.instructions.id, 'tool:write');
 });
 
 test('incomplete, unknown, wrong-type and invalid-probability answers reject the entire batch', async () => {
@@ -105,7 +110,7 @@ test('aborted requests do not call Jev and malformed HTTP payloads fail safely',
 });
 
 test('a same-named skill and tool receive distinct questions in the same request', async () => {
-  let payload: { questions: Record<string, { instructions: { capability_kind: string } }> } | undefined;
+  let payload: { questions: Record<string, { instructions: { id: string } }> } | undefined;
   const scorer = new JevScorer({ apiKey: 'fixture', fetch: async (_url, request) => {
     payload = JSON.parse(String(request?.body));
     return new Response(JSON.stringify({ answers: {
@@ -115,8 +120,8 @@ test('a same-named skill and tool receive distinct questions in the same request
   const result = await scorer.score({ ...input, enabled: [], candidates: ['tool:read', 'skill:read'], allCapabilities: [
     input.allCapabilities[0]!, { id: 'skill:read', kind: 'skill', name: 'read', description: 'Reading workflow', guidance: '' },
   ] }, new AbortController().signal);
-  assert.equal(payload?.questions.capability_0?.instructions.capability_kind, 'tool');
-  assert.equal(payload?.questions.capability_1?.instructions.capability_kind, 'skill');
+  assert.equal(payload?.questions.capability_0?.instructions.id, 'tool:read');
+  assert.equal(payload?.questions.capability_1?.instructions.id, 'skill:read');
   assert.deepEqual(result.scores, { 'tool:read': 0.1, 'skill:read': 0.9 });
 });
 
@@ -139,8 +144,9 @@ test('Vercel evaluation uses boolean probabilities, gateway headers and normaliz
   assert.equal(headers.get('ai-gateway-protocol-version'), '0.0.1');
   assert.equal(body.model, undefined);
   assert.equal(body.questions.capability_0.type, 'boolean');
-  assert.equal(body.questions.capability_0.instructions.capability_name, 'read');
-  assert.deepEqual(body.state.all_capabilities, input.allCapabilities);
+  assert.equal(body.questions.capability_0.instructions.id, 'tool:read');
+  assert.equal(body.state.all_capabilities, undefined);
+  assert.equal(body.questions.capability_0.instructions.description, 'Read records');
   assert.deepEqual(result.scores, { 'tool:read': 0.8, 'tool:write': 0.01 });
   assert.deepEqual(result.usage, { input_tokens: 100, output_tokens: 0, total_tokens: 100 });
 });
@@ -196,7 +202,7 @@ test('OpenAI-compatible chat scoring supports unauthenticated local servers and 
   assert.equal(request?.headers.has('authorization'), false);
   assert.equal(request?.body.model, 'local-chat');
   assert.equal(request?.body.stream, false);
-  assert.deepEqual(JSON.parse(request?.body.messages[1].content).candidates, input.candidates);
+  assert.deepEqual(JSON.parse(request?.body.messages[1].content).candidates.map((c: { id: string }) => c.id), input.candidates);
   assert.deepEqual(result.scores, { 'tool:read': 0.9, 'tool:write': 0.1 });
   assert.deepEqual(result.usage, { input_tokens: 200, output_tokens: 20, total_tokens: 220 });
 });
@@ -224,4 +230,42 @@ test('chat protocol requires an explicit model and does not borrow the Vercel ke
   assert.equal(config.apiKey, undefined);
   assert.equal(config.protocol, 'openai');
   assert.equal(jevConfigFromEnv({ JEV_PROTOCOL: 'openai', OPENAI_API_KEY: 'chat-key' }).apiKey, 'chat-key');
+});
+
+test('compact payload removes duplicate task and schemas and retains only the latest Agent reply and skill dependencies', async () => {
+  let payload: any;
+  const scorer = new JevScorer({ apiKey: 'fixture', fetch: async (_url, request) => {
+    payload = JSON.parse(String(request?.body));
+    return new Response(JSON.stringify({ answers: {
+      capability_0: { type: 'noul', noul: 0.8 }, capability_1: { type: 'noul', noul: 0.1 },
+    } }));
+  } });
+  await scorer.score({ ...input, agentResponse: 'Need to inspect records.',
+    activeSkills: [{ id: 'skill:debug', name: 'debug', instructions: 'Run verification after editing.' }],
+    allCapabilities: input.allCapabilities.map(c => ({ ...c, parameters: { secretSchemaMarker: 'x'.repeat(10000) } })),
+  }, new AbortController().signal);
+  assert.deepEqual(payload.state.agent_response, 'Need to inspect records.');
+  assert.deepEqual(payload.state.active_skills, [{ id: 'skill:debug', instructions: 'Run verification after editing.' }]);
+  const encoded = JSON.stringify(payload);
+  assert.equal(encoded.split('Read records').length - 1, 2); // task plus the candidate's distinct description
+  assert.doesNotMatch(encoded, /secretSchemaMarker|all_capabilities|capability_kind|capability_name/);
+  assert.ok(encoded.length < 1800, `Unexpected request growth: ${encoded.length} characters`);
+});
+
+test('all scoring protocols send only the latest public Agent reply from a long trajectory', async () => {
+  const latest = 'Latest final answer';
+  for (const protocol of ['systemone', 'vercel', 'openai'] as const) {
+    let state: any;
+    const scorer = new JevScorer({ protocol, apiKey: 'fixture', model: 'test', fetch: async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      state = protocol === 'openai' ? JSON.parse(body.messages[1].content).state : body.state;
+      return new Response(JSON.stringify(protocol === 'openai'
+        ? { choices: [{ finish_reason: 'stop', message: { content: '{"scores":{"tool:read":0.9,"tool:write":0.1}}' } }] }
+        : { answers: Object.fromEntries([0.9, 0.1].map((score, i) => [`capability_${i}`, protocol === 'vercel'
+          ? { type: 'boolean', probability: score } : { type: 'noul', noul: score }])) }));
+    } });
+    await scorer.score({ ...input, agentResponse: latest }, new AbortController().signal);
+    assert.deepEqual(state.agent_response, latest);
+    assert.doesNotMatch(JSON.stringify(state), /OLD_HISTORY|HIDDEN|TOOL_RESULT|USER_MESSAGE/);
+  }
 });

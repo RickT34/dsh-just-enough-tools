@@ -12,7 +12,7 @@ test('real agent loop starts empty, appends tools and guidance, and scores only 
   const executed: string[] = [];
   const adapter = new ScriptedAdapter([
     textResponse('First I need lookup; its result may require decode.'),
-    callResponse('lookup'), callResponse('decode'), textResponse('Completed'),
+    callResponse('lookup'), textResponse('The lookup finished; decoding is required.'), callResponse('decode'), textResponse('Completed'),
   ]);
   const h = await harness(adapter, {
     catalog: [candidate('lookup', async () => { executed.push('lookup'); return 'Now decode'; }),
@@ -28,16 +28,17 @@ test('real agent loop starts empty, appends tools and guidance, and scores only 
   const agent = await h.create();
   await run(agent);
   assert.deepEqual(h.errors, []);
-  assert.deepEqual(adapter.requests.map(r => r.tools?.map(t => t.name) ?? []), [[], ['lookup'], ['decode', 'lookup'], ['decode', 'lookup']]);
+  assert.deepEqual(adapter.requests.map(r => r.tools?.map(t => t.name) ?? []), [[], ['lookup'], ['lookup'], ['decode', 'lookup'], ['decode', 'lookup']]);
   assert.doesNotMatch(prompt(adapter.requests[0]!), /GUIDANCE_/);
   assert.match(prompt(adapter.requests[1]!), /GUIDANCE_lookup/);
   assert.doesNotMatch(prompt(adapter.requests[1]!), /GUIDANCE_decode/);
-  assert.match(prompt(adapter.requests[2]!), /GUIDANCE_decode/);
+  assert.match(prompt(adapter.requests[3]!), /GUIDANCE_decode/);
   assert.deepEqual(executed, ['lookup', 'decode']);
   assert.deepEqual(inputs.map(i => i.candidates), [['tool:lookup', 'tool:decode', 'tool:unused'], ['tool:decode', 'tool:unused'], ['tool:unused']]);
   assert.equal(inputs[0]!.task, 'Complete the original task');
   assert.equal(inputs[1]!.allCapabilities.length, 3);
-  assert.match(JSON.stringify(inputs[1]!.progress), /Now decode/);
+  assert.equal(inputs[1]!.agentResponse, 'The lookup finished; decoding is required.');
+  assert.doesNotMatch(JSON.stringify(inputs[1]!.agentResponse), /Now decode|First I need/);
   assert.equal(agent.session.snapshotEvents().filter(e => e.type === 'just-enough-tools/continued').length, 1);
 });
 
@@ -116,7 +117,7 @@ test('preview assemblies do not rescore completed state or disclose more tools',
   await run(agent);
   await agent.ctx.systemPrompt.assemble(assembleContextFor(agent));
   await agent.ctx.systemPrompt.assemble(assembleContextFor(agent));
-  assert.equal(calls, 1);
+  assert.equal(calls, 2);
   assert.deepEqual(h.errors, []);
 });
 
@@ -264,14 +265,14 @@ test('unmanaged schema providers cannot expose extra tools to the first request'
   assert.match(String(h.errors[0]), /schema provider/);
 });
 
-test('a new user turn reaches the scorer before its first model request', async t => {
+test('a new user task reaches the scorer after its final Agent reply', async t => {
   const inputs: ScoringInput[] = [];
-  const adapter = new ScriptedAdapter([textResponse('plan'), textResponse('A completed'), callResponse('b'), textResponse('B completed')]);
+  const adapter = new ScriptedAdapter([textResponse('plan'), textResponse('A completed'), textResponse('Need b for the new task'), callResponse('b'), textResponse('B completed')]);
   const h = await harness(adapter, {
     catalog: [candidate('a'), candidate('b')],
     scorer: { score: async (input): Promise<ScoringResult> => {
       inputs.push(input);
-      return { scores: inputs.length === 1 ? { 'tool:a': 1, 'tool:b': 0 } : { 'tool:b': 1 } };
+      return { scores: inputs.length === 1 ? { 'tool:a': 1, 'tool:b': 0 } : { 'tool:b': input.task.includes('Now do B') ? 1 : 0 } };
     } },
   });
   t.after(() => h.ctx.fiber.dispose());
@@ -279,9 +280,11 @@ test('a new user turn reaches the scorer before its first model request', async 
   await run(agent, 'First do A');
   await run(agent, 'Now do B');
   assert.deepEqual(h.errors, []);
-  assert.equal(inputs[1]!.task, 'First do A\nNow do B');
-  assert.match(JSON.stringify(inputs[1]!.progress), /Now do B/);
-  assert.deepEqual(adapter.requests[2]!.tools?.map(t => t.name), ['a', 'b']);
+  assert.equal(inputs[2]!.task, 'First do A\nNow do B');
+  assert.match(JSON.stringify(inputs[1]!.agentResponse), /A completed/);
+  assert.doesNotMatch(JSON.stringify(inputs[1]!.agentResponse), /Now do B/);
+  assert.deepEqual(adapter.requests[2]!.tools?.map(t => t.name), ['a']);
+  assert.deepEqual(adapter.requests[3]!.tools?.map(t => t.name), ['a', 'b']);
   assert.equal(agent.session.snapshotEvents().filter(e => e.type === 'just-enough-tools/continued').length, 1);
 });
 
@@ -289,10 +292,10 @@ test('Jev probabilities drive registration through the real Harness loop', async
   const questionTools: string[][] = [];
   const scorer = new JevScorer({ apiKey: 'local-fixture', fetch: async (_url, request) => {
     const body = JSON.parse(String(request?.body));
-    const questions = Object.entries(body.questions) as Array<[string, { instructions: { capability_name: string } }]>;
-    questionTools.push(questions.map(([, q]) => q.instructions.capability_name));
+    const questions = Object.entries(body.questions) as Array<[string, { instructions: { id: string } }]>;
+    questionTools.push(questions.map(([, q]) => q.instructions.id));
     return new Response(JSON.stringify({ answers: Object.fromEntries(questions.map(([id, question]) => [id, {
-      type: 'noul', noul: question.instructions.capability_name === 'read' ? 0.9 : 0.1,
+      type: 'noul', noul: question.instructions.id === 'tool:read' ? 0.9 : 0.1,
     }])) }), { headers: { 'Content-Type': 'application/json' } });
   } });
   const adapter = new ScriptedAdapter([textResponse('Need archive access'), callResponse('read'), textResponse('Done')]);
@@ -302,7 +305,7 @@ test('Jev probabilities drive registration through the real Harness loop', async
   await run(agent);
   assert.deepEqual(h.errors, []);
   assert.deepEqual(adapter.requests.map(r => r.tools?.map(tool => tool.name) ?? []), [[], ['read'], ['read']]);
-  assert.deepEqual(questionTools, [['read', 'write'], ['write']]);
+  assert.deepEqual(questionTools, [['tool:read', 'tool:write'], ['tool:write']]);
   assert.ok(agent.session.snapshotEvents().some(e => e.type === 'tool/result' && !e.data.message.isError));
 });
 
@@ -354,4 +357,26 @@ test('inherited guidance from an unknown capability still fails closed', async t
   const agent = await h.create();
   await assert.rejects(agent.ctx.systemPrompt.assemble(assembleContextFor(agent)), /independently registered capability guidance/);
   assert.equal(adapter.requests.length, 0);
+});
+
+test('scoring waits through tool calls and receives only the round final text', async t => {
+  const replies: string[] = [];
+  const adapter = new ScriptedAdapter([
+    textResponse('Plan'),
+    [...textResponse('Intermediate commentary').filter(chunk => chunk.type !== 'finish'), ...callResponse('read').map(chunk => 'index' in chunk ? { ...chunk, index: chunk.index + 1 } : chunk)],
+    callResponse('read', 'second-read'),
+    textResponse('Finished reading; no more work needed.'),
+  ]);
+  const h = await harness(adapter, {
+    catalog: [candidate('read', async () => { assert.deepEqual(replies, ['Plan']); return 'PRIVATE_TOOL_RESULT'; }), candidate('unused')],
+    scorer: { score: async input => {
+      replies.push(input.agentResponse);
+      return { scores: Object.fromEntries(input.candidates.map(id => [id, id === 'tool:read' ? 0.9 : 0])) };
+    } },
+  });
+  t.after(() => h.ctx.fiber.dispose());
+  const agent = await h.create(); await run(agent);
+  assert.deepEqual(h.errors, []);
+  assert.deepEqual(replies, ['Plan', 'Finished reading; no more work needed.']);
+  assert.equal(adapter.requests.length, 4);
 });

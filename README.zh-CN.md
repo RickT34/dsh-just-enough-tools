@@ -17,20 +17,27 @@ Agent 往往会收到远超当前任务所需的能力，由此产生两类浪�
 
 ## 工作原理
 
-```mermaid
-flowchart TD
-    A(["Agent：先思考<br/>不提供 tools 或 skills"]) -->|答案或计划| B["评分器：评估 tools 与 skills<br/>Jev 或配置的聊天模型"]
-    B -->|开放高于阈值的能力| C["Agent：使用选中的能力"]
-    C -->|未完成：更新进展| B
-```
+![Just enough tools 工作示意：Agent 思考、Jev 评分、插件开放能力、Agent 执行。](docs/assets/how-it-works.svg)
 
-每项能力独立评分，共用一个阈值。**高于阈值**的工具变为可调用，选中的 skill 加载完整指令。已开放能力保留，后续只评估剩余候选。执行 skill 所需的工具仍然独立评分。
+图中分数仅用于说明逐轮选择过程，不是实测结果。[TikZ 源文件](docs/assets/how-it-works.tex)。
+
+图中蓝色表示 tool，紫色表示 skill。Jev 接收用户任务、Agent 最新一轮的最终文字、剩余候选能力摘要、已开放能力集合，以及已启用 skill 的完整指令，不接收工具执行参数 schema。
+
+评分在 Agent 完成一轮工具执行并给出最终文字回复后进行。`agent_response` 是该轮最终回复的纯文本字符串，不包含工具调用、工具结果或隐藏思考。每项能力独立评分，共用一个阈值。**高于阈值**的工具变为可调用，选中的 skill 加载完整指令。已开放能力保留，后续只评估剩余候选。执行 skill 所需的工具仍然独立评分。首轮计划之后，只有新能力被开放才触发下一轮 Agent 执行，否则以 Agent 的答案结束本轮对话。
 
 简单问题可以首轮直接回答：Agent 以 `No external capabilities needed.` 开头并给出完整答案。只有候选发现完整且所有分数**严格低于阈值**时，才跳过第二次 Agent 调用。评分仍会执行；评分失败不会批准提前结束。
 
 ### 例子
 
-对于“修复登录报错，并运行测试”，评分器可以先开放 `login-debug` skill 和 `grep`、`read`，再随任务推进补充 `edit`、`bash`。润色文字可能只需一个写作风格 skill，也可能完全不需要外部能力。
+以“修复登录报错，并运行测试”为例，阈值设为 `0.50`：
+
+| 阶段 | Agent 回复或操作 | Jev / 插件决策 |
+| --- | --- | --- |
+| 思考 | “需要先检查登录流程。” | 开放 `read` 0.94 和 `login-debug` 0.88；`edit` 0.32 和 `bash` 0.21 继续隐藏。 |
+| 检查 | Agent 按 debug 工作流程阅读代码，最后回复：“已找到问题，需要修改代码并运行测试。” | 只评估剩余候选：新增 `edit` 0.97 和 `bash` 0.93。之前开放的能力继续保留。 |
+| 完成 | Agent 修改代码、运行测试，回复：“已修复，测试通过。” | 没有新能力被开放，结束本轮对话。 |
+
+分数和结果为示例。润色文字可能只需一个写作风格 skill，也可能完全不需要外部能力。
 
 ## 安装
 
@@ -46,7 +53,7 @@ npm pack
 安装插件并启动 dsh：
 
 ```sh
-npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/dsh-just-enough-tools-0.5.3.tgz
+npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/dsh-just-enough-tools-0.5.6.tgz
 npx @deepseek-ai/dsh@0.1.7-alpha.1 web
 ```
 

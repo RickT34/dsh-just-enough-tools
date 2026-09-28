@@ -18,7 +18,7 @@ for (const [name, first, score, expected] of [
   const agent = await h.create(); await run(agent);
   assert.deepEqual(h.errors, []);
   assert.equal(adapter.requests.length, expected);
-  assert.equal(calls, 1);
+  assert.equal(calls, expected === 1 || score > 0.5 ? 1 : 2);
   assert.equal(agent.session.snapshotEvents().some(e => e.type === 'just-enough-tools/direct-answer'), expected === 1);
   assert.equal(h.ctx.tools.schemas(agent).length, score > 0.5 ? 1 : 0);
 });
@@ -45,7 +45,7 @@ test('incomplete discovery cannot approve a direct answer', async t => {
 
 test('a later user task is scored again after a direct answer', async t => {
   let calls = 0;
-  const adapter = new ScriptedAdapter([textResponse('No external capabilities needed.\n\n4.'), textResponse('read is now available')]);
+  const adapter = new ScriptedAdapter([textResponse('No external capabilities needed.\n\n4.'), textResponse('Need read for the new task'), textResponse('read is now available')]);
   const h = await harness(adapter, { catalog: [candidate('read')], scorer: {
     score: async input => { calls++; return { scores: { 'tool:read': input.task.includes('Read file') ? 0.9 : 0.1 } }; },
   } });
@@ -53,5 +53,5 @@ test('a later user task is scored again after a direct answer', async t => {
   const agent = await h.create(); await run(agent, '2 + 2?'); await run(agent, 'Read file');
   assert.deepEqual(h.errors, []);
   assert.equal(calls, 2);
-  assert.deepEqual(adapter.requests[1]?.tools?.map(tool => tool.name), ['read']);
+  assert.deepEqual(adapter.requests[2]?.tools?.map(tool => tool.name), ['read']);
 });

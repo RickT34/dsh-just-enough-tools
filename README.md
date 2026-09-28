@@ -17,20 +17,27 @@ The plugin puts tools and skills in one candidate pool and exposes only the capa
 
 ## How it works
 
-```mermaid
-flowchart TD
-    A(["Agent: Think first<br/>No tools or skills"]) -->|Answer or plan| B["Scorer: Evaluate tools and skills<br/>Jev or configured chat model"]
-    B -->|Capabilities above threshold| C["Agent: Use selected capabilities"]
-    C -->|More work: updated progress| B
-```
+![How Just enough tools works: Agent thinks, Jev scores, the plugin opens capabilities, and Agent acts.](docs/assets/how-it-works.svg)
 
-Each capability receives an independent score. Tools **above** the shared threshold become callable; selected skills load their full instructions. Enabled capabilities remain available, while later decisions consider the remaining candidates. A skill's required tools are scored separately.
+Example scores illustrate progressive selection; they are not benchmark results. [Editable TikZ source](docs/assets/how-it-works.tex).
+
+The diagram uses blue for tools and purple for skills. Jev receives the task, the latest final Agent text, summaries of remaining candidates, the enabled capability set, and any active skill instructions. Execution parameter schemas are omitted.
+
+Scoring runs after the Agent finishes its tool-use round. `agent_response` contains only that round’s final text as a string; tool calls, tool results and hidden reasoning are excluded. Each capability receives an independent score. Tools **above** the shared threshold become callable; selected skills load their full instructions. Enabled capabilities remain available, while later decisions consider the remaining candidates. A skill's required tools are scored separately. After the first planning round, new admissions trigger another Agent round; otherwise the Agent's answer ends the turn.
 
 For simple tasks, the Agent can provide a complete first-response answer beginning with `No external capabilities needed.` If discovery is complete and all scores are **strictly below** the threshold, the plugin skips the second Agent call. Scoring still runs; failed scoring does not approve an early finish.
 
 ### Example
 
-For “Fix the login error and run the tests,” the scorer can first enable the `login-debug` skill and `grep`/`read`, then add `edit` and `bash` as the task progresses. A writing task may need only a style skill, or no external capabilities at all.
+For “Fix the login error and run the tests,” with a threshold of `0.50`:
+
+| Stage | Agent response or action | Jev / plugin decision |
+| --- | --- | --- |
+| Think | “I need to inspect the login flow.” | `read` 0.94 and `login-debug` 0.88 are enabled; `edit` 0.32 and `bash` 0.21 stay hidden. |
+| Inspect | Agent reads the code using the debug workflow, then replies: “Bug found. I need to edit and run tests.” | Only remaining candidates are scored: `edit` 0.97 and `bash` 0.93 are added. Previously enabled capabilities stay available. |
+| Finish | Agent edits the code, runs tests, and replies: “Fixed; tests passed.” | No new capability is admitted; the turn ends. |
+
+Scores and outcomes are illustrative. A writing task may need only a style skill, or no external capabilities at all.
 
 ## Install
 
@@ -46,7 +53,7 @@ npm pack
 Install the package and start dsh:
 
 ```sh
-npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/dsh-just-enough-tools-0.5.3.tgz
+npx @deepseek-ai/dsh@0.1.7-alpha.1 plugin --profile web add /absolute/path/to/dsh-just-enough-tools-0.5.6.tgz
 npx @deepseek-ai/dsh@0.1.7-alpha.1 web
 ```
 

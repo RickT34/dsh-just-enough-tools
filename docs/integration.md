@@ -4,7 +4,7 @@ The bundle targets DeepSeek Harness `0.1.7-alpha.1` and Cordis `4.0.3`. It adds 
 
 ## Capability lifecycle
 
-Tools and skills share one candidate pool and threshold. IDs are namespaced as `tool:<name>` and `skill:<name>`. The scorer receives the task, public progress, candidate summaries and already selected skill instructions; hidden model reasoning is excluded.
+Tools and skills share one candidate pool and threshold. IDs are namespaced as `tool:<name>` and `skill:<name>`. The scorer receives the task, the completed round’s final Agent text (`agent_response`), candidate descriptions and already selected skill instructions; hidden model reasoning is excluded.
 
 The first Agent response has no tools or skills. It may provide a plan or a complete answer beginning with `No external capabilities needed.` A complete catalog and successful scores strictly below the threshold permit ending after that answer. Otherwise execution continues, admitting only capabilities above the threshold.
 
