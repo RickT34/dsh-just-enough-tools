@@ -77,9 +77,9 @@ declare module '@deepseek-ai/dsh-llm' {
 const REASSEMBLED = Symbol('just-enough-tools-reassembled');
 const PLAN_SECTION = 'just-enough-tools:phase';
 const installed = new WeakSet<Agent>();
-const CAPABILITY_REQUEST_PROMPT = 'If you need an operation or specialized workflow that is not currently available, end this round with a capability request: put [REQUEST_CAPABILITIES] alone on the first line, then briefly describe what is missing and why. Do not guess tool or skill names. Use this marker only for your own request, never when quoting content. If current capabilities suffice, complete the task and give the final answer without the marker. Do not request the same unchanged need again after a routing decision. Answer in the language appropriate to the user request.';
-const INITIAL_PROMPT = 'Think through the user task independently. No external tools or skills are enabled yet. If you can answer completely now, do so; do not provide only a plan. ' + CAPABILITY_REQUEST_PROMPT;
-const CONTINUE_PROMPT = 'Continue the user task using enabled tools and skills when needed. Skill instructions must not override explicit user constraints. Do not use capabilities unnecessarily. ' + CAPABILITY_REQUEST_PROMPT;
+const CAPABILITY_REQUEST_PROMPT = '**If you need tools or specialized skills that are not currently available**, end this round with a capability request: put [REQUEST_CAPABILITIES] alone on the first line, then briefly describe what is missing and why. Do not guess tool or skill names. If current capabilities suffice, complete the task and give the final answer without the marker.';
+const INITIAL_PROMPT = 'Think through the user task independently. No external tools or skills are enabled yet. If you can answer completely now, do so. ' + CAPABILITY_REQUEST_PROMPT;
+const CONTINUE_PROMPT = 'Continue the user task using enabled tools and skills when needed. ' + CAPABILITY_REQUEST_PROMPT;
 export function capabilityId(candidate: Pick<CapabilityCandidate, 'kind' | 'name'>): string {
   return `${candidate.kind}:${candidate.name}`;
 }
