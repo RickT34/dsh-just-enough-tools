@@ -23,11 +23,20 @@ Example scores illustrate progressive selection; they are not benchmark results.
 
 The diagram uses blue for tools and purple for skills. Jev receives the task, the latest final Agent text, summaries of remaining candidates, the enabled capability set, and any active skill instructions. Execution parameter schemas are omitted.
 
-Scoring runs when the final Agent text contains `REQUEST_CAPABILITIES` or a supported spelling variant anywhere. The Agent is prompted to describe the missing operation or workflow. `agent_response` contains only that round's final text; tool calls, tool results and hidden reasoning are excluded. Tools and skills **above** the shared threshold are enabled and remain available. Later requests score only remaining candidates; skill dependencies are scored separately.
+Scoring runs if the final Agent text contains `REQUEST_CAPABILITIES` or a supported spelling variant anywhere. The Agent is prompted to describe the missing operation or workflow. `agent_response` contains only that round's final text; tool calls, tool results and hidden reasoning are excluded. Tools and skills **above** the shared threshold are enabled and remain available. Later requests score only remaining candidates; skill dependencies are scored separately.
 
 Detection ignores case and tolerates full-width characters, spaces, hyphens and omitted separators. Brackets, position and Markdown formatting do not matter: bare keywords, quoted text and code blocks also match.
 
-Without the marker, the answer ends the turn immediately, including the first response: **no Jev call and no extra Agent call**. After an explicit request, the Agent continues with the routing result. If no capability is admitted, it answers with current capabilities or explains the limitation, without repeating the same request.
+Without the marker or a qualifying direct tool call, the answer ends the turn immediately, including the first response: **no Jev call and no extra Agent call**. After an explicit request, the Agent continues with the routing result. If no capability is admitted, it answers with current capabilities or explains the limitation, without repeating the same request.
+
+
+Each Agent response can trigger these three independent actions, for native calls and complete DeepSeek DSML calls:
+
+1. **Called tool already enabled:** execute it through Harness.
+2. **Called tool exists but is hidden:** validate the call, enable the tool and execute it, without Jev or another planning round.
+3. **`REQUEST_CAPABILITIES` is present:** ask Jev to score the remaining candidates.
+
+Tool calls and the request marker can coexist. Directly called tools are opened and executed; Jev then scores the remaining candidates before the next model request, using only the accompanying text. Already enabled tools are not registered again. Only catalog tools qualify; normal approval policies and execution guards still apply. Unknown calls fail explicitly, and quoted DSML examples are not executed.
 
 ### Example
 

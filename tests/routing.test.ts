@@ -42,21 +42,21 @@ test('real agent loop starts empty, appends tools and guidance, and scores only 
   assert.equal(agent.session.snapshotEvents().filter(e => e.type === 'just-enough-tools/continued').length, 1);
 });
 
-test('an unregistered tool cannot execute even if the model guesses its name', async t => {
+test('a known hidden tool opens on a native call even after a low Jev score', async t => {
   let called = false;
   const adapter = new ScriptedAdapter([textResponse('[REQUEST_CAPABILITIES]\nplan'), callResponse('hidden'), textResponse('done')]);
   const h = await harness(adapter, {
-    catalog: [candidate('hidden', async () => { called = true; return 'bad'; })],
-    scorer: { score: async () => ({ scores: { 'tool:hidden': 0 } }) },
+    catalog: [candidate('read'), candidate('hidden', async () => { called = true; return 'bad'; })],
+    scorer: { score: async () => ({ scores: { 'tool:read': 1, 'tool:hidden': 0 } }) },
   });
   t.after(() => h.ctx.fiber.dispose());
   const agent = await h.create();
   await run(agent);
   assert.deepEqual(h.errors, []);
-  assert.equal(called, false);
+  assert.equal(called, true);
   const result = agent.session.snapshotEvents().find(e => e.type === 'tool/result');
-  assert.equal(result?.type === 'tool/result' && result.data.message.isError, true);
-  assert.equal(h.ctx.tools.get('hidden', agent), undefined);
+  assert.equal(result?.type === 'tool/result' && result.data.message.isError, false);
+  assert.ok(h.ctx.tools.get('hidden', agent));
 });
 
 test('invalid scores leave the entire batch closed and allow a final answer', async t => {
@@ -363,7 +363,7 @@ test('scoring waits through tool calls and receives only the round final text', 
   const replies: string[] = [];
   const adapter = new ScriptedAdapter([
     textResponse('[REQUEST_CAPABILITIES]\nPlan'),
-    [...textResponse('[REQUEST_CAPABILITIES]\nIntermediate commentary').filter(chunk => chunk.type !== 'finish'), ...callResponse('read').map(chunk => 'index' in chunk ? { ...chunk, index: chunk.index + 1 } : chunk)],
+    [...textResponse('Intermediate commentary').filter(chunk => chunk.type !== 'finish'), ...callResponse('read').map(chunk => 'index' in chunk ? { ...chunk, index: chunk.index + 1 } : chunk)],
     callResponse('read', 'second-read'),
     textResponse('Finished reading; no more work needed.'),
   ]);

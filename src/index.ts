@@ -1,10 +1,12 @@
 /** Progressive admission of tools and skills into one isolated agent. */
 import type { Context } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent';
-import { createUserMessage } from '@deepseek-ai/dsh-llm';
+import { createUserMessage, isAgentLoopRequest } from '@deepseek-ai/dsh-llm';
 import type { UserMessage } from '@deepseek-ai/dsh-llm';
 import type { PromptAssembly, AssembleContext } from '@deepseek-ai/dsh-system-prompt';
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools';
+import { assertSupportedJsonSchema, validateJsonSchemaValue } from '@deepseek-ai/dsh-tools';
+import { recoverDirectCalls } from './direct-calls.js';
 import { jevConfigFromEnv, JevScorer, ScorerError, validateScores } from './scorer.js';
 import type { CapabilitySummary, Scorer, ScoringResult } from './scorer.js';
 export * from './scorer.js';
@@ -63,6 +65,7 @@ export interface Decision {
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
     'just-enough-tools/decision': Decision;
+    'just-enough-tools/direct-call': { version: 1; source: 'native' | 'dsml'; added: string[]; enabled: string[] };
     'just-enough-tools/continued': { version: 1 };
     'just-enough-tools/direct-answer': { version: 1; afterStepSeq: number };
   }
@@ -261,8 +264,7 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
       const committedIds = new Set(history.map(m => m.id));
       const pending = [...claimedMessages.values()].filter(m => !committedIds.has(m.id));
       const reply = history.findLast(message => message.role === 'assistant');
-      const agentResponse = reply && !reply.content.some(block => block.type === 'tool-call')
-        ? reply.content.filter(block => block.type === 'text').map(block => block.text).join('\n') : '';
+      const agentResponse = reply?.content.filter(block => block.type === 'text').map(block => block.text).join('\n') ?? '';
       const priorTasks = agent.session.snapshotEvents().filter(e => e.type === 'user/message' && e.data.source.kind === 'user')
         .flatMap(e => e.type === 'user/message' ? [e.data] : []);
       const task = [...priorTasks, ...pending.filter(m => m.source.kind === 'user')]
@@ -311,18 +313,44 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
   try {
     disposers.push(ctx.tools.restrict({ allow: [] }));
     assertRegistry();
-    const previous = agent.session.snapshotEvents().filter(e => e.type === 'just-enough-tools/decision').at(-1);
-    if (previous?.type === 'just-enough-tools/decision') {
+    const previous = agent.session.snapshotEvents().findLast(e => e.type === 'just-enough-tools/decision' || e.type === 'just-enough-tools/direct-call');
+    if (previous?.type === 'just-enough-tools/decision' || previous?.type === 'just-enough-tools/direct-call') {
       const prior = previous.data;
-      const ids = prior.enabled.map(id => prior.version === 2 ? id : `tool:${id}`);
+      const ids = prior.enabled.map(id => previous.type === 'just-enough-tools/direct-call' || prior.version === 2 ? id : `tool:${id}`);
       const tools = ids.filter(id => id.startsWith('tool:'));
       if (tools.some(id => !catalog.has(id))) throw new Error('Resumed session references tools missing from the catalog.');
       commit(tools, new Map());
       pendingRestore = ids.filter(id => id.startsWith('skill:'));
       if (tools.length + pendingRestore.length !== ids.length) throw new Error('Invalid restored capability IDs.');
-      lastScored = prior.afterStepSeq;
+      lastScored = previous.type === 'just-enough-tools/decision' ? previous.data.afterStepSeq : -1;
     }
     continued = agent.session.snapshotEvents().some(e => e.type === 'just-enough-tools/continued' || e.type === 'just-enough-tools/direct-answer');
+    disposers.push(ctx.on('llm/stream', (options, next) => {
+      if (!isAgentLoopRequest(options) || options.sessionId !== agent.session.id || options.purpose
+        || disposed) return next();
+      const signal = options.signal ? AbortSignal.any([options.signal, lifetime.signal]) : lifetime.signal;
+      return recoverDirectCalls(next(), (calls, source) => {
+        signal.throwIfAborted();
+        const added = [...new Set(calls.map(call => `tool:${call.name}`))].filter(id => !enabled.has(id));
+        if (!added.length) return;
+        // Validate the entire batch before opening any capability. Never resolve
+        // names against the global registry or call executors outside Harness.
+        for (const call of calls) {
+          const candidate = catalog.get(`tool:${call.name}`);
+          if (candidate?.kind !== 'tool') throw new Error('Just enough tools: direct call references an unknown tool.');
+          let args: unknown;
+          try { args = JSON.parse(call.arguments || '{}'); }
+          catch { throw new Error('Just enough tools: invalid direct-call JSON arguments.'); }
+          assertSupportedJsonSchema(candidate.parameters);
+          if (validateJsonSchemaValue(candidate.parameters, args).length) {
+            throw new Error('Just enough tools: direct-call arguments do not match the tool schema.');
+          }
+        }
+        commit(added, new Map());
+        agent.session.append('just-enough-tools/direct-call', { version: 1, source, added, enabled: [...enabled] });
+        if (config.debug?.()) writeRoutingDiagnostic(`[Just enough tools] session=${agent.session.id} direct-call source=${source}; added=${JSON.stringify(added)}; skipped Jev.`);
+      }, signal);
+    }));
     disposers.push(ctx.on('agent/inbox/claimed', ({ message }) => { claimedMessages.set(message.id, message); }));
     disposers.push(ctx.tools.guard(exec => changing || !enabled.has(`tool:${exec.name}`) ? 'Just enough tools: tool is not enabled.' : undefined));
     disposers.push(ctx.systemPrompt.section({ name: PLAN_SECTION, order: 900, interpolate: false,
@@ -331,7 +359,22 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
       if ((context as AssembleContext & { [REASSEMBLED]?: boolean })[REASSEMBLED]) return checkAssembly(await next());
       if ((context.signal || pendingRestore.length) && !disposed) {
         const signal = context.signal ? AbortSignal.any([context.signal, lifetime.signal]) : lifetime.signal;
-        const rebuild = await prepare(signal);
+        let rebuild = await prepare(signal);
+        // Tool calls naturally advance the loop without turn-stopping. Honor
+        // capability requests from that same response before the next request.
+        if (context.signal) {
+          const events = agent.session.snapshotEvents();
+          const latestStep = steps().at(-1);
+          const currentTurn = events.findLast(event => event.type === 'turn/start');
+          const reply = agent.session.deriveMessages().findLast(message => message.role === 'assistant');
+          const text = reply?.content.filter(block => block.type === 'text').map(block => block.text).join('\n') ?? '';
+          if (latestStep && currentTurn?.type === 'turn/start' && latestStep.data.turn === currentTurn.data.turn
+            && latestStep.data.step < maxSteps && latestStep.seq > lastScored
+            && reply?.content.some(block => block.type === 'tool-call') && requestsCapabilities(text)) {
+            await scoreOnce(latestStep.seq, signal);
+            rebuild = true;
+          }
+        }
         signal.throwIfAborted();
         if (rebuild) return checkAssembly(await ctx.systemPrompt.assemble({ ...context, [REASSEMBLED]: true } as AssembleContext));
       }
@@ -363,8 +406,7 @@ export function installJustEnoughTools(agent: Agent, config: Config): () => void
       const completed = steps();
       const latestStep = completed.at(-1);
       const replyAtStop = agent.session.deriveMessages().findLast(message => message.role === 'assistant');
-      if (!latestStep || latestStep.data.turn !== turn || replyAtStop?.content.some(block => block.type === 'tool-call')
-        || !replyAtStop?.content.some(block => block.type === 'text' && block.text.trim())) return;
+      if (!latestStep || latestStep.data.turn !== turn || !replyAtStop?.content.some(block => block.type === 'text' && block.text.trim())) return;
       const text = replyAtStop.content.filter(block => block.type === 'text').map(block => block.text).join('\n').trim();
       const requested = requestsCapabilities(text);
       if (!requested) {
